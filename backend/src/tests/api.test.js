@@ -3,6 +3,7 @@ import request from 'supertest';
 import mongoose from 'mongoose';
 import app from '../app.js';
 import { env } from '../config/env.js';
+import { connectDB } from '../config/db.js';
 import { User, Ticket, TicketMessage, EmailEvent } from '../database/index.js';
 
 describe('BitMax Production Ticketing System - Full Test Suite', () => {
@@ -16,12 +17,12 @@ describe('BitMax Production Ticketing System - Full Test Suite', () => {
 
   beforeAll(async () => {
     if (mongoose.connection.readyState === 0) {
-      await mongoose.connect(env.mongoUri);
+      await connectDB();
     }
-  });
+  }, 15000);
 
   afterAll(async () => {
-    // cleanup
+    await mongoose.disconnect();
   });
 
   describe('1. Authentication Flow', () => {
@@ -235,6 +236,27 @@ describe('BitMax Production Ticketing System - Full Test Suite', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.data.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it('customer CANNOT see internal_note_added in activity timeline', async () => {
+      const res = await request(app)
+        .get(`/api/tickets/${createdTicketId}/activity`)
+        .set('Authorization', `Bearer ${customerToken}`);
+
+      expect(res.status).toBe(200);
+      const hasInternalNote = res.body.data.some((a) => a.action === 'internal_note_added');
+      expect(hasInternalNote).toBe(false);
+    });
+
+    it('customer dashboard summary scopes recent activities to customer own tickets without internal notes', async () => {
+      const res = await request(app)
+        .get('/api/dashboard/summary')
+        .set('Authorization', `Bearer ${customerToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.metrics).toBeDefined();
+      const hasInternalNote = res.body.data.recentActivity.some((a) => a.action === 'internal_note_added');
+      expect(hasInternalNote).toBe(false);
     });
   });
 });

@@ -40,9 +40,9 @@ A production-grade, enterprise-ready full-stack customer support and ticketing p
 | **Frontend** | React 18, Vite 5, Tailwind CSS, Redux Toolkit, React Router v6, Lucide Icons |
 | **Backend** | Node.js (ES Modules), Express.js 4, Socket.IO 4, Multer, Sanitize-HTML |
 | **Database** | MongoDB with Mongoose 8 ODM |
-| **Email & Queue** | Nodemailer (SMTP/Ethereal fallback), Resilient Async Background Queue |
+| **Email & Queue** | Resend API, Resilient Async Background Queue |
 | **API & Docs** | Swagger / OpenAPI 3.0 (`/api/docs`), Postman Collection v2.1 |
-| **Testing** | Vitest, Supertest (15/15 comprehensive integration tests passing) |
+| **Testing** | Vitest, Supertest (17/17 comprehensive integration tests passing) |
 | **DevOps** | Docker, Docker Compose |
 
 ---
@@ -160,7 +160,7 @@ The backend includes a comprehensive Vitest suite covering authentication, RBAC,
 cd backend
 npm test
 ```
-Result: **15 tests passing across 5 test suites**.
+Result: **17 tests passing across 5 test suites**.
 
 ---
 

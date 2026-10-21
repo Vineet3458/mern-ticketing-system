@@ -129,12 +129,13 @@ const ticketSlice = createSlice({
     },
     // Real-time Socket.IO dispatch handlers
     socketMessageReceived: (state, action) => {
-      const { ticketId, message, status } = action.payload;
+      const { ticketId, message, status } = action.payload || {};
       if (state.currentTicket && (state.currentTicket._id === ticketId || state.currentTicket.ticketNumber === ticketId)) {
-        // Prevent duplicate appending
-        const exists = state.messages.some((m) => m._id === message._id);
-        if (!exists) {
-          state.messages.push(message);
+        if (message && message._id) {
+          const exists = state.messages.some((m) => m._id === message._id);
+          if (!exists) {
+            state.messages.push(message);
+          }
         }
         if (status) state.currentTicket.status = status;
       }

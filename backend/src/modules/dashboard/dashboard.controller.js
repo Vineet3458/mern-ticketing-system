@@ -11,6 +11,17 @@ export const getDashboardSummary = asyncHandler(async (req, res) => {
   // Scope filter: Customer only sees their tickets; Agent/Admin see platform tickets
   const baseFilter = isCustomer && user._id ? { requesterId: new mongoose.Types.ObjectId(user._id) } : {};
 
+  // For activity stream: Customer only sees activities for their own tickets, excluding internal notes
+  let activityFilter = {};
+  if (isCustomer && user._id) {
+    const customerTickets = await Ticket.find({ requesterId: user._id }).select('_id').lean();
+    const customerTicketIds = customerTickets.map((t) => t._id);
+    activityFilter = {
+      ticketId: { $in: customerTicketIds },
+      action: { $ne: 'internal_note_added' },
+    };
+  }
+
   const [
     total,
     open,
@@ -50,7 +61,7 @@ export const getDashboardSummary = asyncHandler(async (req, res) => {
     ]),
 
     // Recent activity stream
-    TicketActivity.find(isCustomer ? {} : {})
+    TicketActivity.find(activityFilter)
       .sort({ createdAt: -1 })
       .limit(10)
       .populate('ticketId', 'ticketNumber subject status priority requesterId'),
@@ -69,7 +80,9 @@ export const getDashboardSummary = asyncHandler(async (req, res) => {
 
   // Filter recent activities to those user can view if customer
   const filteredActivity = isCustomer
-    ? recentActivity.filter((act) => act.ticketId && String(act.ticketId.requesterId) === String(user.id))
+    ? recentActivity.filter(
+        (act) => act.ticketId && String(act.ticketId.requesterId) === String(user._id || user.id)
+      )
     : recentActivity;
 
   return sendResponse(res, 200, 'Dashboard statistics retrieved', {

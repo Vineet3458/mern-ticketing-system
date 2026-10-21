@@ -7,12 +7,19 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
+        target: 'http://127.0.0.1:5000',
         changeOrigin: true,
       },
       '/socket.io': {
-        target: 'http://localhost:5000',
+        target: 'http://127.0.0.1:5000',
         ws: true,
+        configure: (proxy) => {
+          proxy.on('error', (err) => {
+            // Suppress noisy ECONNRESET / ECONNREFUSED when backend server restarts
+            if (err.code === 'ECONNRESET' || err.code === 'ECONNREFUSED') return;
+            console.warn('[vite] proxy error:', err.message);
+          });
+        },
       },
     },
   },

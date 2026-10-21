@@ -71,6 +71,10 @@ export const TicketDetailPage = () => {
   const isCustomer = user?.role === 'customer';
   const isAgentOrAdmin = user?.role === 'agent' || user?.role === 'admin';
 
+  const displayedMessages = isCustomer
+    ? (messages || []).filter((m) => m.type !== 'internal')
+    : (messages || []);
+
   // Fetch ticket details
   useEffect(() => {
     if (ticketId) {
@@ -297,7 +301,7 @@ export const TicketDetailPage = () => {
 
             {/* Conversation Messages */}
             <div className="space-y-4">
-              {messages.map((msg) => {
+              {displayedMessages.map((msg) => {
                 const isInternal = msg.type === 'internal';
                 const isEmailSource = msg.source === 'email';
 

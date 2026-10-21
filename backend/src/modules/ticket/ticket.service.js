@@ -538,7 +538,12 @@ export const ticketService = {
       throw ApiError.forbidden('You can only view activity for your own tickets');
     }
 
-    const activities = await TicketActivity.find({ ticketId: ticket._id }).sort({ createdAt: -1 });
+    const filter = { ticketId: ticket._id };
+    if (user.role === ROLES.CUSTOMER) {
+      filter.action = { $ne: 'internal_note_added' };
+    }
+
+    const activities = await TicketActivity.find(filter).sort({ createdAt: -1 });
     return activities;
   },
 

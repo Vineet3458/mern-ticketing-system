@@ -25,8 +25,8 @@ export const initSocket = (httpServer, clientUrl) => {
       logger.info(`[Socket.IO] Client ${socket.id} left room ticket:${ticketId}`);
     });
 
-    socket.on('disconnect', () => {
-      logger.info(`[Socket.IO] Client disconnected: ${socket.id}`);
+    socket.on('disconnect', (reason) => {
+      logger.info(`[Socket.IO] Client disconnected: ${socket.id} (reason: ${reason})`);
     });
   });
 
@@ -37,7 +37,15 @@ export const ioService = {
   emitTicketMessage: (ticketId, data) => {
     if (!io) return;
     io.to(`ticket:${ticketId}`).emit('ticket_message', data);
-    io.emit('ticket_updated', { ticketId, ...data });
+    const sanitized = { ...data };
+    if (sanitized.message?.type === 'internal') {
+      sanitized.message = {
+        _id: sanitized.message._id,
+        type: 'internal',
+        createdAt: sanitized.message.createdAt,
+      };
+    }
+    io.emit('ticket_updated', { ticketId, ...sanitized });
   },
 
   emitTicketStatusUpdated: (ticketId, data) => {
