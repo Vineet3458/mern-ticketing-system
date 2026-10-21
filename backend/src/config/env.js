@@ -21,5 +21,14 @@ export const env = {
     expiresMinutes: Number(process.env.OTP_EXPIRES_MINUTES) || 5,
     maxAttempts: Number(process.env.OTP_MAX_ATTEMPTS) || 5,
   },
+  email: {
+    host: process.env.SMTP_HOST || '',
+    port: Number(process.env.SMTP_PORT) || 587,
+    user: process.env.SMTP_USER || '',
+    pass: process.env.SMTP_PASS || '',
+    from: process.env.EMAIL_FROM || 'BitMax Support <support@bitmax.local>',
+  },
+  redisUrl: process.env.REDIS_URL || 'redis://127.0.0.1:6379',
   isProd: process.env.NODE_ENV === 'production',
 };
+

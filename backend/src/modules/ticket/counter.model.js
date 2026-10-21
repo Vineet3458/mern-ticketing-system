@@ -1,14 +1,20 @@
 import mongoose from 'mongoose';
 
-// Atomic counter used to generate TKT-YYYY-000001 numbers
 const counterSchema = new mongoose.Schema({
-  _id: String, // e.g. "ticket-2026"
+  name: { type: String, required: true, unique: true },
   seq: { type: Number, default: 0 },
 });
 
 export const Counter = mongoose.model('Counter', counterSchema);
 
-export const nextSequence = async (key) => {
-  const doc = await Counter.findByIdAndUpdate(key, { $inc: { seq: 1 } }, { new: true, upsert: true });
-  return doc.seq;
+export const getNextTicketNumber = async () => {
+  const currentYear = new Date().getFullYear();
+  const counterName = `ticket_${currentYear}`;
+  const counter = await Counter.findOneAndUpdate(
+    { name: counterName },
+    { $inc: { seq: 1 } },
+    { new: true, upsert: true }
+  );
+  const formattedSeq = String(counter.seq).padStart(6, '0');
+  return `TKT-${currentYear}-${formattedSeq}`;
 };

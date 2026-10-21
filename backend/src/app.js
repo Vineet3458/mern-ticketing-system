@@ -12,9 +12,17 @@ import { globalLimiter } from './middleware/rateLimiter.js';
 import { notFound } from './middleware/notFound.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
+import swaggerUi from 'swagger-ui-express';
+import { swaggerDocument } from './docs/swagger.js';
+
 const app = express();
 
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: false,
+  })
+);
 app.use(cors({ origin: env.clientUrl, credentials: true }));
 app.use(globalLimiter);
 app.use(express.json({ limit: '1mb' }));
@@ -25,7 +33,12 @@ app.use(hpp());
 app.use(compression());
 if (!env.isProd) app.use(morgan('dev'));
 
+// Swagger / OpenAPI documentation
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+app.get('/api/docs.json', (req, res) => res.json(swaggerDocument));
+
 app.use('/api', routes);
+
 
 app.use(notFound);
 app.use(errorHandler);

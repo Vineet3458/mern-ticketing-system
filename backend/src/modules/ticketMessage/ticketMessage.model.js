@@ -1,24 +1,70 @@
 import mongoose from 'mongoose';
 import { MESSAGE_TYPE, MESSAGE_SOURCE, ROLES } from '../../constants/index.js';
 
-const ticketMessageSchema = new mongoose.Schema({
-  ticketId: { type: mongoose.Schema.Types.ObjectId, ref: 'Ticket', required: true, index: true },
-  senderId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  senderEmail: { type: String, lowercase: true, trim: true },
-  senderRole: { type: String, enum: [...Object.values(ROLES), 'system'] },
-  type: { type: String, enum: Object.values(MESSAGE_TYPE), default: MESSAGE_TYPE.PUBLIC },
-  body: { type: String, required: true },          // sanitized HTML/text
-  attachments: [{ filename: String, url: String, mimeType: String, size: Number }],
-  source: { type: String, enum: Object.values(MESSAGE_SOURCE), default: MESSAGE_SOURCE.WEB },
-  // Email metadata (for dedupe + troubleshooting)
-  emailMessageId: { type: String },
-  emailMeta: { inReplyTo: String, references: [String], subject: String, rawHeaders: Object },
-  readBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-}, { timestamps: true });
+const ticketMessageSchema = new mongoose.Schema(
+  {
+    ticketId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Ticket',
+      required: true,
+      index: true,
+    },
+    senderId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    senderEmail: {
+      type: String,
+      required: true,
+      lowercase: true,
+      trim: true,
+    },
+    senderName: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    senderRole: {
+      type: String,
+      enum: [...Object.values(ROLES), 'system'],
+      default: ROLES.CUSTOMER,
+    },
+    type: {
+      type: String,
+      enum: Object.values(MESSAGE_TYPE),
+      default: MESSAGE_TYPE.PUBLIC,
+      index: true,
+    },
+    body: {
+      type: String,
+      required: [true, 'Message body cannot be empty'],
+      trim: true,
+    },
+    attachments: [
+      {
+        name: { type: String, required: true },
+        url: { type: String, required: true },
+        size: { type: Number, default: 0 },
+        mimeType: { type: String, default: '' },
+      },
+    ],
+    source: {
+      type: String,
+      enum: Object.values(MESSAGE_SOURCE),
+      default: MESSAGE_SOURCE.WEB,
+    },
+    emailMessageId: {
+      type: String,
+      default: undefined,
+    },
+  },
+  { timestamps: true }
+);
 
-// Prevent duplicate inbound emails per ticket
+ticketMessageSchema.index({ ticketId: 1, createdAt: 1 });
 ticketMessageSchema.index(
-  { ticketId: 1, emailMessageId: 1 },
+  { emailMessageId: 1 },
   { unique: true, partialFilterExpression: { emailMessageId: { $type: 'string' } } }
 );
 
