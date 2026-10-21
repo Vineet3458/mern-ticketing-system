@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 import { EmailEvent } from '../database/index.js';
@@ -12,48 +12,53 @@ import {
   otpTemplate,
 } from '../templates/email/index.js';
 
-let transporter = null;
+// ─────────────────────────────────────────────────────────────────────────────
+// Resend client singleton — created once on first use
+// ─────────────────────────────────────────────────────────────────────────────
+let resendClient = null;
 
-const getTransporter = async () => {
-  if (transporter) return transporter;
+const getResendClient = () => {
+  if (resendClient) return resendClient;
 
-  if (env.email.host && env.email.user) {
-    transporter = nodemailer.createTransport({
-      host: env.email.host,
-      port: env.email.port,
-      secure: env.email.port === 465,
-      auth: {
-        user: env.email.user,
-        pass: env.email.pass,
-      },
-    });
-    logger.info(`[EmailService] Configured SMTP transporter with ${env.email.host}`);
-  } else {
-    // Development / fallback stream transport
-    transporter = nodemailer.createTransport({
-      streamTransport: true,
-      newline: 'unix',
-      buffer: true,
-    });
-    logger.info('[EmailService] Using simulated local transport (logs emails without external SMTP requirement)');
+  if (!env.email.resendApiKey) {
+    logger.warn('[Resend] ⚠️  RESEND_API_KEY is not set.');
+    logger.warn('[Resend] 📝 Get a free API key at https://resend.com and add it to .env as RESEND_API_KEY');
+    logger.warn('[Resend] 📧 Emails will be skipped until the key is configured.');
+    return null;
   }
 
-  return transporter;
+  resendClient = new Resend(env.email.resendApiKey);
+  logger.info('[Resend] ✅ Resend client initialized successfully');
+  return resendClient;
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Core send function
+// ─────────────────────────────────────────────────────────────────────────────
 export const sendRawEmail = async ({
   to,
   subject,
   html,
-  text,
   ticketNumber = null,
   ticketId = null,
   headers = {},
 }) => {
-  try {
-    const transport = await getTransporter();
-    const messageId = `<${Date.now()}.${Math.random().toString(36).substring(2, 9)}@bitmax.local>`;
+  const client = getResendClient();
 
+  // If no API key is configured, log and skip gracefully — never crash
+  if (!client) {
+    logger.warn(`[Resend] 📭 Email skipped (no API key) — To: ${to} | Subject: "${subject}"`);
+    return { success: false, error: 'RESEND_API_KEY not configured' };
+  }
+
+  try {
+    // Build the final subject with ticket number prefix when applicable
+    const finalSubject =
+      ticketNumber && !subject.includes(ticketNumber)
+        ? `[${ticketNumber}] ${subject}`
+        : subject;
+
+    // Build custom email headers for threading in email clients
     const customHeaders = { ...headers };
     if (ticketNumber) {
       customHeaders['X-Ticket-Number'] = ticketNumber;
@@ -61,42 +66,39 @@ export const sendRawEmail = async ({
       customHeaders['In-Reply-To'] = `<ticket-${ticketNumber}@bitmax.local>`;
     }
 
-    const mailOptions = {
+    const { data, error } = await client.emails.send({
       from: env.email.from,
-      to,
-      subject: ticketNumber && !subject.includes(ticketNumber) ? `[${ticketNumber}] ${subject}` : subject,
+      to: Array.isArray(to) ? to : [to],
+      reply_to: ticketNumber
+        ? `BitMax Support <support+${ticketNumber}@bitmax.local>`
+        : env.email.from,
+      subject: finalSubject,
       html,
-      text: text || html.replace(/<[^>]*>?/gm, ''),
-      messageId,
-      replyTo: ticketNumber ? `BitMax Support <support+${ticketNumber}@bitmax.local>` : env.email.from,
       headers: customHeaders,
-    };
+    });
 
-    const info = await transport.sendMail(mailOptions);
-
-    if (info && info.message) {
-      logger.info(`[EmailService Outbound] To: ${to} | Subject: "${mailOptions.subject}" | Message-ID: ${messageId}`);
+    if (error) {
+      throw new Error(error.message || JSON.stringify(error));
     }
 
-    // Record outbound email event
+    logger.info(`[Resend] ✅ Email sent — To: ${to} | Subject: "${finalSubject}" | ID: ${data.id}`);
+
+    // Persist outbound email event in the database
     await EmailEvent.create({
-      providerMessageId: info?.messageId || messageId,
-      messageId,
+      providerMessageId: data.id,
+      messageId: data.id,
       ticketId,
       direction: EMAIL_DIRECTION.OUTBOUND,
       status: EMAIL_STATUS.SENT,
-      payload: {
-        to,
-        subject: mailOptions.subject,
-        ticketNumber,
-      },
+      payload: { to, subject: finalSubject, ticketNumber },
       processedAt: new Date(),
     });
 
-    return { success: true, messageId };
+    return { success: true, id: data.id };
   } catch (err) {
-    logger.error('[EmailService] Failed to send email:', err.message);
+    logger.error(`[Resend] ❌ Failed to send email to ${to}:`, err.message);
 
+    // Persist the failure for audit purposes
     await EmailEvent.create({
       messageId: `failed_${Date.now()}`,
       ticketId,
@@ -107,13 +109,17 @@ export const sendRawEmail = async ({
       processedAt: new Date(),
     });
 
-    throw err;
+    // Never propagate — email failure should never crash an HTTP request
+    return { success: false, error: err.message };
   }
 };
 
-// Queue processor registration
+// ─────────────────────────────────────────────────────────────────────────────
+// Background queue handler — processes jobs from emailQueue
+// ─────────────────────────────────────────────────────────────────────────────
 emailQueue.setHandler(async (job) => {
   const { type, payload } = job.data;
+
   switch (type) {
     case 'TICKET_CREATED':
       await sendRawEmail({
@@ -196,6 +202,9 @@ emailQueue.setHandler(async (job) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Public service API — called by ticket & auth services
+// ─────────────────────────────────────────────────────────────────────────────
 export const emailService = {
   queueTicketCreated: (ticket, requester) => {
     emailQueue.add('send_ticket_created', {
@@ -213,7 +222,7 @@ export const emailService = {
   },
 
   queueTicketAssigned: (ticket, agent) => {
-    if (!agent || !agent.email) return;
+    if (!agent?.email) return;
     emailQueue.add('send_ticket_assigned', {
       type: 'TICKET_ASSIGNED',
       payload: {
@@ -226,7 +235,7 @@ export const emailService = {
     });
   },
 
-  queueTicketReply: (ticket, reply, recipientEmail, recipientName) => {
+  queueTicketReply: (ticket, reply, recipientEmail) => {
     if (!recipientEmail) return;
     emailQueue.add('send_ticket_reply', {
       type: 'TICKET_REPLY',

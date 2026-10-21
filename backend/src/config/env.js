@@ -22,13 +22,12 @@ export const env = {
     maxAttempts: Number(process.env.OTP_MAX_ATTEMPTS) || 5,
   },
   email: {
-    host: process.env.SMTP_HOST || '',
-    port: Number(process.env.SMTP_PORT) || 587,
-    user: process.env.SMTP_USER || '',
-    pass: process.env.SMTP_PASS || '',
-    from: process.env.EMAIL_FROM || 'BitMax Support <support@bitmax.local>',
+    // Resend API key — get yours free at https://resend.com
+    resendApiKey: process.env.RESEND_API_KEY || '',
+    // "From" address — must be a verified domain in your Resend account
+    // In dev you can use: onboarding@resend.dev (works without domain verification)
+    from: process.env.EMAIL_FROM || 'BitMax Support <onboarding@resend.dev>',
   },
-  redisUrl: process.env.REDIS_URL || 'redis://127.0.0.1:6379',
   isProd: process.env.NODE_ENV === 'production',
 };
 
