@@ -70,6 +70,11 @@ export const Sidebar = ({ onOpenSimulator }) => {
           <span>Create Ticket</span>
         </NavLink>
 
+        <NavLink to="/categories" className={linkClass}>
+          <Tags className="w-4 h-4 text-indigo-500" />
+          <span>Categories</span>
+        </NavLink>
+
         {isAdmin && (
           <>
             <div className="pt-6 px-3 pb-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
@@ -79,11 +84,6 @@ export const Sidebar = ({ onOpenSimulator }) => {
             <NavLink to="/admin/users" className={linkClass}>
               <Users className="w-4 h-4" />
               <span>User Management</span>
-            </NavLink>
-
-            <NavLink to="/admin/categories" className={linkClass}>
-              <Tags className="w-4 h-4" />
-              <span>Categories</span>
             </NavLink>
           </>
         )}

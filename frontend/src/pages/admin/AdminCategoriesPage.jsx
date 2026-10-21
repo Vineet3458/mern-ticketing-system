@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { PlusCircle, Tag, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { PlusCircle, Tag, CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react';
 import { fetchCategories, createCategory } from '../../features/categories/categorySlice.js';
 import { Modal } from '../../components/common/Modal.jsx';
 
 export const AdminCategoriesPage = () => {
   const dispatch = useDispatch();
+  const { user } = useSelector((state) => state.auth);
   const { categories, isLoading } = useSelector((state) => state.categories);
+  const isAdmin = user?.role === 'admin';
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [name, setName] = useState('');
@@ -16,8 +19,8 @@ export const AdminCategoriesPage = () => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    dispatch(fetchCategories(true));
-  }, [dispatch]);
+    dispatch(fetchCategories(isAdmin));
+  }, [dispatch, isAdmin]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -32,7 +35,7 @@ export const AdminCategoriesPage = () => {
         setName('');
         setDescription('');
         setIsModalOpen(false);
-        dispatch(fetchCategories(true));
+        dispatch(fetchCategories(isAdmin));
       } else {
         setError(resAction.payload || 'Failed to create category');
       }
@@ -41,23 +44,41 @@ export const AdminCategoriesPage = () => {
     }
   };
 
+  const displayedCategories = isAdmin
+    ? categories
+    : categories.filter((c) => c.isActive !== false);
+
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Ticket Categories</h1>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+            {isAdmin ? 'Ticket Categories' : 'Support Categories'}
+          </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Configure department classifications, routing tags, and support topics.
+            {isAdmin
+              ? 'Configure department classifications, routing tags, and support topics.'
+              : 'Browse available support classifications and raise a targeted request.'}
           </p>
         </div>
 
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md transition-all self-start sm:self-auto"
-        >
-          <PlusCircle className="w-4 h-4" />
-          <span>New Category</span>
-        </button>
+        {isAdmin ? (
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md transition-all self-start sm:self-auto"
+          >
+            <PlusCircle className="w-4 h-4" />
+            <span>New Category</span>
+          </button>
+        ) : (
+          <Link
+            to="/tickets/create"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md transition-all self-start sm:self-auto"
+          >
+            <PlusCircle className="w-4 h-4" />
+            <span>Create Ticket</span>
+          </Link>
+        )}
       </div>
 
       {msg && (
@@ -69,33 +90,49 @@ export const AdminCategoriesPage = () => {
 
       {/* Categories Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {categories.map((c) => (
+        {displayedCategories.map((c) => (
           <div
             key={c._id}
-            className="bg-white p-5 rounded-2xl border border-slate-200/80 card-shadow space-y-2 flex flex-col justify-between"
+            className="bg-white p-5 rounded-2xl border border-slate-200/80 card-shadow space-y-3 flex flex-col justify-between hover:border-blue-200 transition-colors"
           >
             <div>
               <div className="flex items-center justify-between mb-2">
                 <span className="p-2 rounded-xl bg-blue-50 text-blue-600">
                   <Tag className="w-4 h-4" />
                 </span>
-                <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                    c.isActive
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      : 'bg-slate-100 text-slate-500 border-slate-200'
-                  }`}
-                >
-                  {c.isActive ? 'Active' : 'Disabled'}
-                </span>
+                {isAdmin ? (
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                      c.isActive
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-slate-100 text-slate-500 border-slate-200'
+                    }`}
+                  >
+                    {c.isActive ? 'Active' : 'Disabled'}
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200">
+                    Available
+                  </span>
+                )}
               </div>
               <h3 className="font-bold text-slate-900 text-sm">{c.name}</h3>
               <p className="text-xs text-slate-500 mt-1 line-clamp-2">
-                {c.description || 'No description provided.'}
+                {c.description || 'General support inquiries and requests.'}
               </p>
             </div>
-            <div className="text-[11px] text-slate-400 pt-3 border-t border-slate-100">
-              Added: {new Date(c.createdAt).toLocaleDateString()}
+
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
+              <span className="text-slate-400">
+                {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'Standard'}
+              </span>
+              <Link
+                to={`/tickets/create?category=${encodeURIComponent(c.name)}`}
+                className="font-bold text-blue-600 hover:text-blue-700 inline-flex items-center gap-1 group"
+              >
+                <span>Raise Ticket</span>
+                <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
+              </Link>
             </div>
           </div>
         ))}

@@ -33,12 +33,13 @@ export default function App() {
           <Route path="/tickets" element={<TicketListPage />} />
           <Route path="/tickets/create" element={<CreateTicketPage />} />
           <Route path="/tickets/:ticketId" element={<TicketDetailPage />} />
+          <Route path="/categories" element={<AdminCategoriesPage />} />
           <Route path="/profile" element={<UserProfilePage />} />
 
           {/* Admin Protected Operations */}
           <Route element={<RoleRoute allowedRoles={['admin']} />}>
             <Route path="/admin/users" element={<AdminUsersPage />} />
-            <Route path="/admin/categories" element={<AdminCategoriesPage />} />
+            <Route path="/admin/categories" element={<Navigate to="/categories" replace />} />
           </Route>
         </Route>
       </Route>

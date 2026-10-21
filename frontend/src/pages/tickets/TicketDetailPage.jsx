@@ -19,6 +19,7 @@ import {
   Check,
   MailCheck,
   User,
+  Tag,
 } from 'lucide-react';
 import {
   fetchTicketById,
@@ -458,6 +459,14 @@ export const TicketDetailPage = () => {
                 <span className="text-slate-400 block text-[11px] font-semibold uppercase">Requester</span>
                 <span className="font-bold text-slate-800">{currentTicket.requesterId?.name || currentTicket.requesterEmail}</span>
                 <span className="text-slate-500 block text-[11px]">{currentTicket.requesterEmail}</span>
+              </div>
+
+              <div>
+                <span className="text-slate-400 block text-[11px] font-semibold uppercase">Category</span>
+                <span className="font-bold text-slate-800 flex items-center gap-1.5 mt-0.5">
+                  <Tag className="w-3.5 h-3.5 text-blue-600" />
+                  <span>{currentTicket.category || 'General'}</span>
+                </span>
               </div>
 
               <div>

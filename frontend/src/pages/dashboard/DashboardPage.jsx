@@ -13,8 +13,10 @@ import {
   Flame,
   ArrowUpRight,
   TrendingUp,
+  Tag,
 } from 'lucide-react';
 import { fetchDashboardSummary } from '../../features/dashboard/dashboardSlice.js';
+import { fetchCategories } from '../../features/categories/categorySlice.js';
 import { StatusBadge } from '../../components/common/StatusBadge.jsx';
 import { PriorityBadge } from '../../components/common/PriorityBadge.jsx';
 import { EmailSimulatorModal } from '../../components/simulator/EmailSimulatorModal.jsx';
@@ -25,11 +27,13 @@ export const DashboardPage = () => {
   const { metrics, byPriority, byCategory, recentActivity, isLoading } = useSelector(
     (state) => state.dashboard
   );
+  const { categories } = useSelector((state) => state.categories);
 
   const [simulatorOpen, setSimulatorOpen] = useState(false);
 
   useEffect(() => {
     dispatch(fetchDashboardSummary());
+    dispatch(fetchCategories(false));
   }, [dispatch]);
 
   const isCustomer = user?.role === 'customer';
@@ -197,33 +201,58 @@ export const DashboardPage = () => {
         </div>
 
         {/* Categories Breakdown */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200/80 card-shadow">
-          <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
-            <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-blue-600" />
-              <span>Top Categories</span>
-            </h3>
-            <Link to="/tickets" className="text-xs font-semibold text-blue-600 hover:underline">
-              View All
-            </Link>
+        <div className="bg-white p-6 rounded-2xl border border-slate-200/80 card-shadow flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+              <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-blue-600" />
+                <span>{isCustomer ? 'Support Categories' : 'Top Categories'}</span>
+              </h3>
+              <Link to="/categories" className="text-xs font-semibold text-blue-600 hover:underline">
+                View All
+              </Link>
+            </div>
+
+            <div className="space-y-2.5">
+              {byCategory && byCategory.length > 0 ? (
+                byCategory.map((cat, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs"
+                  >
+                    <span className="font-semibold text-slate-800">{cat.category}</span>
+                    <span className="px-2 py-0.5 rounded-md bg-white border border-slate-200 font-bold text-slate-700">
+                      {cat.count} tickets
+                    </span>
+                  </div>
+                ))
+              ) : categories && categories.length > 0 ? (
+                categories.slice(0, 4).map((c) => (
+                  <Link
+                    key={c._id}
+                    to={`/tickets/create?category=${encodeURIComponent(c.name)}`}
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 hover:bg-blue-50/60 border border-slate-100 hover:border-blue-200 transition-colors text-xs group"
+                  >
+                    <span className="font-semibold text-slate-800 flex items-center gap-2">
+                      <Tag className="w-3.5 h-3.5 text-blue-500" />
+                      <span>{c.name}</span>
+                    </span>
+                    <span className="text-[11px] font-bold text-blue-600 group-hover:underline">
+                      Raise &rarr;
+                    </span>
+                  </Link>
+                ))
+              ) : (
+                <p className="text-xs text-slate-400 py-4 text-center">No categories recorded yet.</p>
+              )}
+            </div>
           </div>
 
-          <div className="space-y-2.5">
-            {byCategory && byCategory.length > 0 ? (
-              byCategory.map((cat, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs"
-                >
-                  <span className="font-semibold text-slate-800">{cat.category}</span>
-                  <span className="px-2 py-0.5 rounded-md bg-white border border-slate-200 font-bold text-slate-700">
-                    {cat.count} tickets
-                  </span>
-                </div>
-              ))
-            ) : (
-              <p className="text-xs text-slate-400 py-4 text-center">No categories recorded yet.</p>
-            )}
+          <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
+            <span className="text-slate-400">Classifications</span>
+            <Link to="/categories" className="font-bold text-blue-600 hover:text-blue-700">
+              Browse Categories &rarr;
+            </Link>
           </div>
         </div>
 

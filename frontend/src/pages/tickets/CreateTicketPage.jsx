@@ -1,17 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { PlusCircle, Paperclip, ArrowLeft, Send, AlertCircle } from 'lucide-react';
 import { createTicket } from '../../features/tickets/ticketSlice.js';
 import { fetchCategories } from '../../features/categories/categorySlice.js';
 
+const DEFAULT_CATEGORIES = [
+  { _id: 'cat-1', name: 'Technical Support' },
+  { _id: 'cat-2', name: 'Billing & Invoicing' },
+  { _id: 'cat-3', name: 'Account & Security' },
+  { _id: 'cat-4', name: 'General Inquiries' },
+  { _id: 'cat-5', name: 'Feature Request' },
+];
+
 export const CreateTicketPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const requestedCategory = searchParams.get('category') || '';
 
   const { categories } = useSelector((state) => state.categories);
+  const categoryList = categories.length > 0 ? categories : DEFAULT_CATEGORIES;
+
   const [subject, setSubject] = useState('');
-  const [category, setCategory] = useState('');
+  const [category, setCategory] = useState(requestedCategory);
   const [priority, setPriority] = useState('medium');
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -22,10 +34,12 @@ export const CreateTicketPage = () => {
   }, [dispatch]);
 
   useEffect(() => {
-    if (categories.length > 0 && !category) {
-      setCategory(categories[0].name);
+    if (requestedCategory) {
+      setCategory(requestedCategory);
+    } else if (categoryList.length > 0 && !category) {
+      setCategory(categoryList[0].name);
     }
-  }, [categories, category]);
+  }, [categoryList, category, requestedCategory]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -107,7 +121,7 @@ export const CreateTicketPage = () => {
                 onChange={(e) => setCategory(e.target.value)}
                 className="w-full text-sm border border-slate-200 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 bg-white"
               >
-                {categories.map((c) => (
+                {categoryList.map((c) => (
                   <option key={c._id} value={c.name}>
                     {c.name}
                   </option>

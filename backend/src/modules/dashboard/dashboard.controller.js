@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { sendResponse } from '../../utils/ApiResponse.js';
 import { Ticket, TicketActivity } from '../../database/index.js';
@@ -8,7 +9,7 @@ export const getDashboardSummary = asyncHandler(async (req, res) => {
   const isCustomer = user.role === ROLES.CUSTOMER;
 
   // Scope filter: Customer only sees their tickets; Agent/Admin see platform tickets
-  const baseFilter = isCustomer ? { requesterId: user._id } : {};
+  const baseFilter = isCustomer && user._id ? { requesterId: new mongoose.Types.ObjectId(user._id) } : {};
 
   const [
     total,
@@ -52,7 +53,7 @@ export const getDashboardSummary = asyncHandler(async (req, res) => {
     TicketActivity.find(isCustomer ? {} : {})
       .sort({ createdAt: -1 })
       .limit(10)
-      .populate('ticketId', 'ticketNumber subject status priority'),
+      .populate('ticketId', 'ticketNumber subject status priority requesterId'),
   ]);
 
   // Format priority breakdown
