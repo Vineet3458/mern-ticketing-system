@@ -3,6 +3,9 @@ import { sendResponse } from '../../utils/ApiResponse.js';
 import { ApiError } from '../../utils/ApiError.js';
 import { User } from '../../database/index.js';
 import { ROLES } from '../../constants/index.js';
+import bcrypt from 'bcryptjs';
+import { assertEmailNotRestricted } from '../../utils/emailRestrictions.js';
+import { normalizePhoneNumber } from '../../utils/phoneUtils.js';
 
 export const getProfile = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user.id);
@@ -14,6 +17,8 @@ export const getProfile = asyncHandler(async (req, res) => {
     phone: user.phone,
     role: user.role,
     isVerified: user.isVerified,
+    isPhoneVerified: user.isPhoneVerified,
+    phoneVerifiedAt: user.phoneVerifiedAt,
     createdAt: user.createdAt,
     lastLoginAt: user.lastLoginAt,
   });
@@ -25,7 +30,14 @@ export const updateProfile = asyncHandler(async (req, res) => {
   if (!user) throw ApiError.notFound('User not found');
 
   if (name) user.name = name.trim();
-  if (phone) user.phone = phone.trim();
+  if (phone) {
+    const normPhone = normalizePhoneNumber(phone);
+    if (user.phone !== normPhone) {
+      user.phone = normPhone;
+      user.isPhoneVerified = false;
+      user.phoneVerifiedAt = null;
+    }
+  }
   await user.save();
 
   return sendResponse(res, 200, 'Profile updated successfully', {
@@ -54,7 +66,7 @@ export const listUsers = asyncHandler(async (req, res) => {
   const skip = (Number(page) - 1) * Number(limit);
   const [users, total] = await Promise.all([
     User.find(filter)
-      .select('name email phone role isVerified createdAt lastLoginAt')
+      .select('name email phone role isVerified isPhoneVerified phoneVerifiedAt createdAt lastLoginAt')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(Number(limit)),
@@ -89,4 +101,56 @@ export const updateUserRole = asyncHandler(async (req, res) => {
     email: user.email,
     role: user.role,
   });
+});
+
+/**
+ * Admin-only: Create a new admin or agent account directly.
+ * The created account is pre-verified (no OTP flow needed).
+ */
+export const createAdmin = asyncHandler(async (req, res) => {
+  const { name, email, phone, password, role = ROLES.ADMIN } = req.body;
+  const normEmail = email.toLowerCase().trim();
+
+  // Validate email restrictions (no disposable/temp domains)
+  assertEmailNotRestricted(normEmail);
+
+  // Only allow creating admin or agent roles via this endpoint
+  const allowedRoles = [ROLES.ADMIN, ROLES.AGENT];
+  if (!allowedRoles.includes(role)) {
+    throw ApiError.badRequest(`This endpoint only supports creating accounts with role: ${allowedRoles.join(', ')}`);
+  }
+
+  const existingUser = await User.findOne({ email: normEmail });
+  if (existingUser) {
+    throw ApiError.conflict(`An account with email "${normEmail}" already exists.`);
+  }
+
+  const salt = await bcrypt.genSalt(10);
+  const passwordHash = await bcrypt.hash(password, salt);
+
+  const newUser = await User.create({
+    name: name.trim(),
+    email: normEmail,
+    phone: normalizePhoneNumber(phone),
+    passwordHash,
+    role,
+    isVerified: true,       // Admin-created accounts are pre-verified
+    isPhoneVerified: false,
+    lastLoginAt: null,
+  });
+
+  return sendResponse(
+    res,
+    201,
+    `${role.charAt(0).toUpperCase() + role.slice(1)} account created successfully`,
+    {
+      id: newUser._id,
+      name: newUser.name,
+      email: newUser.email,
+      phone: newUser.phone,
+      role: newUser.role,
+      isVerified: newUser.isVerified,
+      createdAt: newUser.createdAt,
+    }
+  );
 });

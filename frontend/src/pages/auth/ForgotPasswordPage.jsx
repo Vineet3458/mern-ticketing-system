@@ -9,7 +9,6 @@ export const ForgotPasswordPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
-  const [devOtp, setDevOtp] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -19,10 +18,9 @@ export const ForgotPasswordPage = () => {
 
     try {
       const res = await api.post('/auth/forgot-password', { email });
-      setMsg(res.data.message || 'OTP sent to your email.');
-      if (res.data.data?.devOtp) setDevOtp(res.data.data.devOtp);
+      setMsg(res.data.message || 'OTP sent to your registered phone and email.');
       setTimeout(() => {
-        navigate('/reset-password', { state: { email, devOtp: res.data.data?.devOtp } });
+        navigate('/reset-password', { state: { email } });
       }, 1200);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to request reset OTP');
@@ -39,19 +37,13 @@ export const ForgotPasswordPage = () => {
             <LifeBuoy className="w-7 h-7" />
           </div>
           <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Reset Password</h2>
-          <p className="text-xs text-slate-500 mt-1">Enter your registered email to receive a reset code</p>
+          <p className="text-xs text-slate-500 mt-1">Enter your registered email to receive a reset code on your mobile & email</p>
         </div>
 
         {msg && (
           <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-700 p-3 rounded-xl text-xs flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
             <span>{msg}</span>
-          </div>
-        )}
-
-        {devOtp && (
-          <div className="mb-4 bg-blue-50 border border-blue-200 text-blue-900 p-3 rounded-xl text-xs">
-            Demo Reset OTP: <strong>{devOtp}</strong>
           </div>
         )}
 

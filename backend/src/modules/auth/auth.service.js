@@ -4,11 +4,19 @@ import { ApiError } from '../../utils/ApiError.js';
 import { generateOTP, hashOTP, compareOTP } from '../../utils/otp.js';
 import { generateTokens, verifyRefreshToken } from '../../utils/token.js';
 import { emailService } from '../../services/email.service.js';
+import { smsService } from '../../services/sms.service.js';
+import { assertEmailNotRestricted } from '../../utils/emailRestrictions.js';
+import { normalizePhoneNumber, buildPhoneQuery, formatDisplayPhone } from '../../utils/phoneUtils.js';
 import { env } from '../../config/env.js';
 
 export const authService = {
   async register({ name, email, phone, password, role }) {
     const normEmail = email.toLowerCase().trim();
+    const normPhone = normalizePhoneNumber(phone);
+
+    // Validate email against restrictions (disposable domains, blocklist, etc.)
+    assertEmailNotRestricted(normEmail);
+
     let existingUser = await User.findOne({ email: normEmail });
 
     if (existingUser && existingUser.isVerified) {
@@ -25,7 +33,7 @@ export const authService = {
     let user;
     if (existingUser && !existingUser.isVerified) {
       existingUser.name = name;
-      existingUser.phone = phone;
+      existingUser.phone = normPhone;
       existingUser.passwordHash = passwordHash;
       if (role) existingUser.role = role;
       existingUser.otpHash = otpHash;
@@ -37,7 +45,7 @@ export const authService = {
       user = await User.create({
         name,
         email: normEmail,
-        phone,
+        phone: normPhone,
         passwordHash,
         role: role || 'customer',
         isVerified: false,
@@ -48,6 +56,16 @@ export const authService = {
       });
     }
 
+    // Send real OTP SMS to mobile phone
+    if (normPhone) {
+      await smsService.sendPhoneOTP({
+        phone: normPhone,
+        otp,
+        name,
+        expiresMinutes: env.otp.expiresMinutes,
+      });
+    }
+
     // Send verification OTP via email
     emailService.queueOTP(normEmail, name, otp);
 
@@ -55,9 +73,8 @@ export const authService = {
       userId: user._id,
       email: user.email,
       name: user.name,
-      message: 'Registration successful. Please verify the OTP sent to your email.',
-      // For automated evaluation / easy testing, we also attach devOtp when not in production
-      ...(env.isProd ? {} : { devOtp: otp }),
+      message: 'Registration successful. A verification OTP has been dispatched to your mobile phone and email.',
+      ...(env.isTest ? { devOtp: otp } : {}),
     };
   },
 
@@ -122,6 +139,10 @@ export const authService = {
 
   async loginPassword({ email, password, userAgent = '', ip = '' }) {
     const normEmail = email.toLowerCase().trim();
+
+    // Light email check on login to log suspicious patterns but not hard-block
+    assertEmailNotRestricted(normEmail);
+
     const user = await User.findOne({ email: normEmail }).select('+passwordHash');
 
     if (!user) {
@@ -190,10 +211,14 @@ export const authService = {
   },
 
   async requestLoginOtp({ email, phone }) {
-    const query = email ? { email: email.toLowerCase().trim() } : { phone: phone.trim() };
-    const user = await User.findOne(query);
+    let user;
+    if (email) {
+      user = await User.findOne({ email: email.toLowerCase().trim() });
+    } else if (phone) {
+      user = await User.findOne(buildPhoneQuery(phone));
+    }
 
-    if (!user) throw ApiError.notFound('Account not found with this identifier');
+    if (!user) throw ApiError.notFound('Account not found with this mobile number or email');
 
     if (user.isLocked()) {
       throw ApiError.forbidden('Account is temporarily locked. Please try again later.');
@@ -206,18 +231,40 @@ export const authService = {
     user.otpType = 'login';
     await user.save();
 
-    emailService.queueOTP(user.email, user.name, otp);
+    // Send real OTP SMS to user's registered phone
+    if (user.phone) {
+      await smsService.sendPhoneOTP({
+        phone: user.phone,
+        otp,
+        name: user.name,
+        expiresMinutes: env.otp.expiresMinutes,
+      });
+    }
+
+    // Also queue backup email OTP if user has email
+    if (user.email) {
+      emailService.queueOTP(user.email, user.name, otp);
+    }
+
+    const recipientText = user.phone
+      ? `mobile number ending in ...${user.phone.slice(-4)}`
+      : user.email;
 
     return {
-      message: 'Login OTP sent successfully',
+      message: `Login OTP sent successfully to ${recipientText}`,
       email: user.email,
-      ...(env.isProd ? {} : { devOtp: otp }),
+      phone: user.phone,
+      ...(env.isTest ? { devOtp: otp } : {}),
     };
   },
 
   async verifyLoginOtp({ email, phone, otp, userAgent = '', ip = '' }) {
-    const query = email ? { email: email.toLowerCase().trim() } : { phone: phone.trim() };
-    const user = await User.findOne(query).select('+otpHash +otpExpiresAt +otpAttempts +otpType');
+    let user;
+    if (email) {
+      user = await User.findOne({ email: email.toLowerCase().trim() }).select('+otpHash +otpExpiresAt +otpAttempts +otpType');
+    } else if (phone) {
+      user = await User.findOne(buildPhoneQuery(phone)).select('+otpHash +otpExpiresAt +otpAttempts +otpType');
+    }
 
     if (!user) throw ApiError.notFound('Account not found');
 
@@ -254,7 +301,11 @@ export const authService = {
       userAgent,
       ip,
     });
-    if (user.refreshTokens.length > 5) user.refreshTokens = user.refreshTokens.slice(-5);
+
+    // Keep only last 5 active refresh sessions
+    if (user.refreshTokens.length > 5) {
+      user.refreshTokens = user.refreshTokens.slice(-5);
+    }
 
     await user.save();
 
@@ -315,6 +366,8 @@ export const authService = {
 
   async forgotPassword(email) {
     const normEmail = email.toLowerCase().trim();
+    assertEmailNotRestricted(normEmail);
+
     const user = await User.findOne({ email: normEmail });
     if (!user) {
       // Return generic message to prevent email enumeration
@@ -328,11 +381,21 @@ export const authService = {
     user.otpType = 'reset';
     await user.save();
 
+    // Send real OTP SMS if user has mobile phone
+    if (user.phone) {
+      await smsService.sendPhoneOTP({
+        phone: user.phone,
+        otp,
+        name: user.name,
+        expiresMinutes: env.otp.expiresMinutes,
+      });
+    }
+
     emailService.queueOTP(normEmail, user.name, otp);
 
     return {
-      message: 'If an account exists with this email, a reset OTP has been sent.',
-      ...(env.isProd ? {} : { devOtp: otp }),
+      message: 'If an account exists with this email, a reset OTP has been sent to your registered mobile phone and email.',
+      ...(env.isTest ? { devOtp: otp } : {}),
     };
   },
 
@@ -369,5 +432,85 @@ export const authService = {
     await user.save();
 
     return { message: 'Password reset successful. Please login with your new password.' };
+  },
+
+  /**
+   * Send a 6-digit OTP to the user's phone number for mobile verification.
+   * Uses the crypto-backed generateOTP and smsService.
+   */
+  async sendPhoneOtp({ phone, userId }) {
+    const normPhone = String(phone).trim();
+    const user = await User.findById(userId);
+    if (!user) throw ApiError.notFound('User account not found');
+
+    if (user.phone !== normPhone) {
+      throw ApiError.badRequest('Provided phone number does not match account phone on file.');
+    }
+
+    const otp = generateOTP();
+    const otpHash = await hashOTP(otp);
+    user.phoneOtpHash = otpHash;
+    user.phoneOtpExpiresAt = new Date(Date.now() + env.otp.expiresMinutes * 60 * 1000);
+    user.phoneOtpAttempts = 0;
+    await user.save();
+
+    const smsResult = await smsService.sendPhoneOTP({
+      phone: normPhone,
+      otp,
+      name: user.name,
+      expiresMinutes: env.otp.expiresMinutes,
+    });
+
+    return {
+      message: `OTP sent to ${normPhone}. Check your messages.`,
+      phone: normPhone,
+      ...(env.isTest ? { devOtp: otp, smsMessageId: smsResult.messageId } : {}),
+    };
+  },
+
+  /**
+   * Verify mobile OTP to mark the phone number as verified.
+   */
+  async verifyPhoneOtp({ phone, otp, userId }) {
+    const normPhone = String(phone).trim();
+    const user = await User.findById(userId).select(
+      '+phoneOtpHash +phoneOtpExpiresAt +phoneOtpAttempts'
+    );
+    if (!user) throw ApiError.notFound('User account not found');
+
+    if (!user.phoneOtpHash || !user.phoneOtpExpiresAt) {
+      throw ApiError.badRequest('No pending phone OTP request. Please request a new code first.');
+    }
+
+    if (user.phoneOtpAttempts >= env.otp.maxAttempts) {
+      throw ApiError.badRequest('Maximum phone OTP attempts reached. Please request a new code.');
+    }
+
+    if (new Date() > user.phoneOtpExpiresAt) {
+      throw ApiError.badRequest('Phone OTP has expired. Please request a new code.');
+    }
+
+    const isMatch = await compareOTP(otp, user.phoneOtpHash);
+    if (!isMatch) {
+      user.phoneOtpAttempts += 1;
+      await user.save();
+      throw ApiError.badRequest(
+        `Invalid phone OTP. Attempts remaining: ${env.otp.maxAttempts - user.phoneOtpAttempts}`
+      );
+    }
+
+    user.phoneOtpHash = null;
+    user.phoneOtpExpiresAt = null;
+    user.phoneOtpAttempts = 0;
+    user.isPhoneVerified = true;
+    user.phoneVerifiedAt = new Date();
+    await user.save();
+
+    return {
+      message: 'Phone number verified successfully!',
+      phone: normPhone,
+      isPhoneVerified: true,
+      phoneVerifiedAt: user.phoneVerifiedAt,
+    };
   },
 };

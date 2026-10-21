@@ -9,7 +9,6 @@ import {
   FolderOpen,
   UserCheck,
   PlusCircle,
-  MailCheck,
   Flame,
   ArrowUpRight,
   TrendingUp,
@@ -19,7 +18,6 @@ import { fetchDashboardSummary } from '../../features/dashboard/dashboardSlice.j
 import { fetchCategories } from '../../features/categories/categorySlice.js';
 import { StatusBadge } from '../../components/common/StatusBadge.jsx';
 import { PriorityBadge } from '../../components/common/PriorityBadge.jsx';
-import { EmailSimulatorModal } from '../../components/simulator/EmailSimulatorModal.jsx';
 
 export const DashboardPage = () => {
   const dispatch = useDispatch();
@@ -28,8 +26,6 @@ export const DashboardPage = () => {
     (state) => state.dashboard
   );
   const { categories } = useSelector((state) => state.categories);
-
-  const [simulatorOpen, setSimulatorOpen] = useState(false);
 
   useEffect(() => {
     dispatch(fetchDashboardSummary());
@@ -120,14 +116,6 @@ export const DashboardPage = () => {
         </div>
 
         <div className="flex items-center gap-3 relative z-10">
-          <button
-            onClick={() => setSimulatorOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold backdrop-blur-sm border border-white/20 transition-all shadow-sm"
-          >
-            <MailCheck className="w-4 h-4 text-emerald-300" />
-            <span>Simulate Inbound Email</span>
-          </button>
-
           <Link
             to="/tickets/create"
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-500 hover:bg-blue-400 text-white text-xs font-bold transition-all shadow-lg shadow-blue-500/30"
@@ -360,12 +348,6 @@ export const DashboardPage = () => {
           )}
         </div>
       </div>
-
-      <EmailSimulatorModal
-        isOpen={simulatorOpen}
-        onClose={() => setSimulatorOpen(false)}
-        onEmailProcessed={() => dispatch(fetchDashboardSummary())}
-      />
     </div>
   );
 };

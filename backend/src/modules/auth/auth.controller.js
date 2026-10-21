@@ -87,3 +87,17 @@ export const resetPassword = asyncHandler(async (req, res) => {
   const result = await authService.resetPassword(req.body);
   return sendResponse(res, 200, result.message);
 });
+
+export const sendPhoneOtp = asyncHandler(async (req, res) => {
+  const { phone } = req.body;
+  const userId = req.user.id;
+  const result = await authService.sendPhoneOtp({ phone, userId });
+  return sendResponse(res, 200, result.message, result);
+});
+
+export const verifyPhoneOtp = asyncHandler(async (req, res) => {
+  const { phone, otp } = req.body;
+  const userId = req.user.id;
+  const result = await authService.verifyPhoneOtp({ phone, otp, userId });
+  return sendResponse(res, 200, result.message, result);
+});

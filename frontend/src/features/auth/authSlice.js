@@ -104,7 +104,6 @@ const authSlice = createSlice({
     isLoading: false,
     error: null,
     otpPendingEmail: '',
-    devOtp: null,
   },
   reducers: {
     clearError: (state) => {
@@ -124,7 +123,6 @@ const authSlice = createSlice({
       .addCase(registerUser.fulfilled, (state, action) => {
         state.isLoading = false;
         state.otpPendingEmail = action.payload.data.email;
-        state.devOtp = action.payload.data.devOtp || null;
       })
       .addCase(registerUser.rejected, (state, action) => {
         state.isLoading = false;
@@ -142,7 +140,6 @@ const authSlice = createSlice({
         state.user = action.payload.user;
         state.accessToken = action.payload.tokens.accessToken;
         state.refreshToken = action.payload.tokens.refreshToken;
-        state.devOtp = null;
         state.otpPendingEmail = '';
 
         localStorage.setItem('user', JSON.stringify(action.payload.user));
@@ -183,7 +180,6 @@ const authSlice = createSlice({
       .addCase(requestLoginOtp.fulfilled, (state, action) => {
         state.isLoading = false;
         state.otpPendingEmail = action.payload.requestedIdentifier;
-        state.devOtp = action.payload.devOtp || null;
       })
       .addCase(requestLoginOtp.rejected, (state, action) => {
         state.isLoading = false;
@@ -201,7 +197,6 @@ const authSlice = createSlice({
         state.user = action.payload.user;
         state.accessToken = action.payload.tokens.accessToken;
         state.refreshToken = action.payload.tokens.refreshToken;
-        state.devOtp = null;
 
         localStorage.setItem('user', JSON.stringify(action.payload.user));
         localStorage.setItem('accessToken', action.payload.tokens.accessToken);
@@ -218,13 +213,13 @@ const authSlice = createSlice({
         state.accessToken = null;
         state.refreshToken = null;
         state.isAuthenticated = false;
-        state.devOtp = null;
       })
 
       // Profile Fetch
       .addCase(fetchUserProfile.fulfilled, (state, action) => {
-        state.user = action.payload;
-        localStorage.setItem('user', JSON.stringify(action.payload));
+        // Merge freshly fetched profile (includes isPhoneVerified, phoneVerifiedAt) into auth state
+        state.user = { ...state.user, ...action.payload };
+        localStorage.setItem('user', JSON.stringify({ ...state.user, ...action.payload }));
       });
   },
 });

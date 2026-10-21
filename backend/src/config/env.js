@@ -29,5 +29,6 @@ export const env = {
     from: process.env.EMAIL_FROM || 'BitMax Support <onboarding@resend.dev>',
   },
   isProd: process.env.NODE_ENV === 'production',
+  isTest: process.env.NODE_ENV === 'test',
 };
 

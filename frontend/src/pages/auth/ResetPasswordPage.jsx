@@ -8,7 +8,7 @@ export const ResetPasswordPage = () => {
   const navigate = useNavigate();
 
   const [email, setEmail] = useState(location.state?.email || '');
-  const [otp, setOtp] = useState(location.state?.devOtp || '');
+  const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [msg, setMsg] = useState('');

@@ -17,7 +17,6 @@ import {
   ShieldAlert,
   Copy,
   Check,
-  MailCheck,
   User,
   Tag,
 } from 'lucide-react';
@@ -37,7 +36,6 @@ import { StatusBadge } from '../../components/common/StatusBadge.jsx';
 import { PriorityBadge } from '../../components/common/PriorityBadge.jsx';
 import { RoleBadge } from '../../components/common/RoleBadge.jsx';
 import { Modal } from '../../components/common/Modal.jsx';
-import { EmailSimulatorModal } from '../../components/simulator/EmailSimulatorModal.jsx';
 import { getSocket, joinTicketRoom, leaveTicketRoom } from '../../services/socket.js';
 import api from '../../services/api.js';
 
@@ -59,7 +57,6 @@ export const TicketDetailPage = () => {
   const [isResolveModalOpen, setIsResolveModalOpen] = useState(false);
   const [isReopenModalOpen, setIsReopenModalOpen] = useState(false);
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
-  const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
   const [actionReason, setActionReason] = useState('');
 
   // Agents list for assignment dropdown
@@ -246,14 +243,6 @@ export const TicketDetailPage = () => {
 
         {/* Quick Lifecycle Action Controls */}
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => setIsSimulatorOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-colors"
-          >
-            <MailCheck className="w-4 h-4 text-blue-600" />
-            <span>Simulate Email Reply</span>
-          </button>
-
           {isAgentOrAdmin && currentTicket.status !== 'resolved' && currentTicket.status !== 'closed' && (
             <button
               onClick={() => setIsResolveModalOpen(true)}
@@ -652,14 +641,6 @@ export const TicketDetailPage = () => {
           </div>
         </div>
       </Modal>
-
-      {/* Email Simulator Modal for this Ticket */}
-      <EmailSimulatorModal
-        isOpen={isSimulatorOpen}
-        onClose={() => setIsSimulatorOpen(false)}
-        currentTicket={currentTicket}
-        onEmailProcessed={() => dispatch(fetchTicketById(ticketId))}
-      />
     </div>
   );
 };

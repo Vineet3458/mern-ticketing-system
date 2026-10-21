@@ -1,49 +1,247 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  :root {
+    --color-brand: 37 99 235;          /* blue-600 */
+    --color-brand-hover: 29 78 216;    /* blue-700 */
+    --color-success: 5 150 105;        /* emerald-600 */
+    --color-warning: 217 119 6;        /* amber-600 */
+    --color-danger: 220 38 38;         /* red-600 */
+    --color-admin: 147 51 234;         /* purple-600 */
+
+    --shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.05);
+    --shadow: 0 1px 3px 0 rgba(0,0,0,0.07), 0 1px 2px -1px rgba(0,0,0,0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.05);
+    --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.06), 0 4px 6px -4px rgba(0,0,0,0.04);
+    --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.06), 0 8px 10px -6px rgba(0,0,0,0.04);
+  }
+
   body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
     @apply bg-slate-50 text-slate-800 selection:bg-blue-600 selection:text-white min-h-screen;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    letter-spacing: -0.02em;
   }
 }
 
-/* Custom modern scrollbars */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 9999px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+/* ─────────────────────────────────────────────────────
+   MODERN CUSTOM SCROLLBARS
+───────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+* { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+
+/* ─────────────────────────────────────────────────────
+   GLASS / SURFACE SHADOWS
+───────────────────────────────────────────────────── */
+.card-shadow {
+  box-shadow: 0 1px 3px 0 rgba(0,0,0,0.06), 0 1px 2px -1px rgba(0,0,0,0.04);
 }
 
-/* Glassmorphism and modern surface shadows */
-.card-shadow {
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+.card-shadow-md {
+  box-shadow: 0 4px 8px -2px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.04);
 }
 
 .card-shadow-hover {
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
+
 .card-shadow-hover:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 12px 20px -4px rgba(0,0,0,0.09), 0 4px 6px -4px rgba(0,0,0,0.04);
 }
 
-/* Pulse animation for live Socket indicator */
+/* ─────────────────────────────────────────────────────
+   GLASSMORPHISM PANELS
+───────────────────────────────────────────────────── */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+/* ─────────────────────────────────────────────────────
+   GRADIENT TEXT UTILITIES
+───────────────────────────────────────────────────── */
+.gradient-text-blue {
+  background: linear-gradient(135deg, #1d4ed8, #3b82f6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-text-purple {
+  background: linear-gradient(135deg, #7c3aed, #6366f1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ─────────────────────────────────────────────────────
+   ANIMATIONS
+───────────────────────────────────────────────────── */
+
+/* Live Socket indicator */
 @keyframes pulse-live {
   0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.9); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+.live-indicator { animation: pulse-live 2s infinite ease-in-out; }
+
+/* Fade-slide in for modals, alerts, panels */
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.anim-fade-in { animation: fadeSlideIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* Slide up from bottom */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.anim-slide-up { animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* Spin for loading */
+@keyframes spinSmooth {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.spin-smooth { animation: spinSmooth 0.8s linear infinite; }
+
+/* Shimmer skeleton */
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+.skeleton {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
 }
 
-.live-indicator {
-  animation: pulse-live 2s infinite ease-in-out;
+/* Bounce in for success states */
+@keyframes bounceIn {
+  0% { transform: scale(0.9); opacity: 0; }
+  60% { transform: scale(1.04); opacity: 1; }
+  100% { transform: scale(1); }
+}
+.bounce-in { animation: bounceIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* ─────────────────────────────────────────────────────
+   FORM INPUT FOCUS GLOW
+───────────────────────────────────────────────────── */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+}
+
+/* ─────────────────────────────────────────────────────
+   SIDEBAR NAV ACTIVE INDICATOR
+───────────────────────────────────────────────────── */
+.nav-active-glow {
+  box-shadow: 0 4px 12px -2px rgba(37, 99, 235, 0.35);
+}
+
+/* ─────────────────────────────────────────────────────
+   PREMIUM TABLE ROWS
+───────────────────────────────────────────────────── */
+.table-row-hover {
+  transition: background-color 0.15s ease;
+}
+.table-row-hover:hover {
+  background-color: rgba(248, 250, 252, 0.8);
+}
+
+/* ─────────────────────────────────────────────────────
+   BUTTON INTERACTION STATES
+───────────────────────────────────────────────────── */
+.btn-primary {
+  @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-white rounded-xl transition-all;
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  box-shadow: 0 4px 12px -2px rgba(37, 99, 235, 0.35);
+}
+.btn-primary:hover {
+  background: linear-gradient(135deg, #1d4ed8, #2563eb);
+  box-shadow: 0 6px 16px -2px rgba(37, 99, 235, 0.45);
+  transform: translateY(-1px);
+}
+.btn-primary:active { transform: translateY(0); }
+.btn-primary:disabled { opacity: 0.55; transform: none; box-shadow: none; }
+
+.btn-danger {
+  @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-white rounded-xl transition-all;
+  background: linear-gradient(135deg, #dc2626, #ef4444);
+  box-shadow: 0 4px 12px -2px rgba(220, 38, 38, 0.3);
+}
+.btn-danger:hover {
+  background: linear-gradient(135deg, #b91c1c, #dc2626);
+  transform: translateY(-1px);
+}
+.btn-danger:active { transform: translateY(0); }
+
+/* ─────────────────────────────────────────────────────
+   TICKET PRIORITY PILL ANIMATIONS
+───────────────────────────────────────────────────── */
+@keyframes urgentPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  50% { box-shadow: 0 0 0 5px rgba(239, 68, 68, 0); }
+}
+.priority-urgent { animation: urgentPulse 2s ease-in-out infinite; }
+
+/* ─────────────────────────────────────────────────────
+   AUTH PAGE BACKGROUND MESH
+───────────────────────────────────────────────────── */
+.auth-bg {
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(99, 102, 241, 0.12) 0%, transparent 45%),
+    radial-gradient(ellipse at 50% 80%, rgba(16, 185, 129, 0.07) 0%, transparent 50%),
+    linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+}
+
+/* ─────────────────────────────────────────────────────
+   OTP INPUT SPECIAL STYLE
+───────────────────────────────────────────────────── */
+.otp-input {
+  @apply text-center text-2xl font-black font-mono tracking-[10px] border-2 rounded-xl py-3.5 outline-none transition-all;
+  letter-spacing: 0.6em;
+}
+.otp-input:focus {
+  @apply border-blue-500;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+/* ─────────────────────────────────────────────────────
+   NOTIFICATION TOAST / BADGE
+───────────────────────────────────────────────────── */
+.badge-dot {
+  @apply absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white;
+  animation: pulse-live 1.5s infinite ease-in-out;
+}
+
+/* ─────────────────────────────────────────────────────
+   STATUS BAR BOTTOM GRADIENT
+───────────────────────────────────────────────────── */
+.status-bar-gradient {
+  background: linear-gradient(90deg, #2563eb 0%, #7c3aed 50%, #2563eb 100%);
+  background-size: 200% 100%;
+  animation: shimmer 3s linear infinite;
 }

@@ -38,6 +38,14 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    isPhoneVerified: {
+      type: Boolean,
+      default: false,
+    },
+    phoneVerifiedAt: {
+      type: Date,
+      default: null,
+    },
     otpHash: {
       type: String,
       select: false,
@@ -58,6 +66,21 @@ const userSchema = new mongoose.Schema(
       enum: ['register', 'login', 'reset', null],
       select: false,
       default: null,
+    },
+    phoneOtpHash: {
+      type: String,
+      select: false,
+      default: null,
+    },
+    phoneOtpExpiresAt: {
+      type: Date,
+      select: false,
+      default: null,
+    },
+    phoneOtpAttempts: {
+      type: Number,
+      select: false,
+      default: 0,
     },
     failedLoginAttempts: {
       type: Number,
