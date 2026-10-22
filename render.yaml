@@ -24,6 +24,10 @@ services:
         generateValue: true
       - key: GMAIL_IMAP_ENABLED
         value: "false"
+      - key: GOOGLE_APPS_SCRIPT_URL
+        sync: false
+      - key: EMAIL_API_SECRET
+        sync: false
   - type: static
     name: mern-ticketing-frontend
     rootDir: frontend

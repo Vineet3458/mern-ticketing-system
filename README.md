@@ -136,8 +136,11 @@ If the deployment host blocks SMTP ports, use the Apps Script web app provider:
 1. Create a Google Apps Script project and copy `apps-script/Code.gs` into its editor.
 2. In **Project Settings → Script properties**, add `EMAIL_API_SECRET` with a long random secret.
 3. Deploy as a **Web app**, executing as your Google account and allowing access to anyone. The shared secret in the request is what authorizes the backend.
-4. Set `GOOGLE_APPS_SCRIPT_URL` to the deployed `/exec` URL and set the same `EMAIL_API_SECRET` in the backend host's environment. The backend tries Nodemailer first and uses Apps Script automatically if SMTP is unconfigured or delivery fails.
-5. Send a test email and check the backend logs and the Apps Script execution log.
+4. Copy the deployed `/exec` URL into the backend's `GOOGLE_APPS_SCRIPT_URL` setting. Set the same `EMAIL_API_SECRET` in the backend host's environment and in Apps Script Script Properties. On Render, add both variables to the backend Web Service (or enter them when applying the Blueprint), then redeploy the backend.
+5. If you edit the Apps Script after deploying it, create a new deployment version or update the existing deployment to that version. Open the `/exec` URL in a browser; it should return `{"success":true,...}`.
+6. Send a test email and check the backend logs and the Apps Script **Executions** page. The backend sends `secret`, `to`, `subject`, and `html` in its POST body, so the script must validate those fields and return JSON with `success: true` on success.
+
+If the app reports an email failure, verify the script's execution log, that its deployment allows access to anyone and executes as your Google account, and that the backend URL ends in `/exec` (not `/dev`). Apps Script may also reject mail when the deploying Google account has exhausted its daily sending quota.
 
 The Apps Script executes under the Google account that deployed it and uses that account's Mail quota/sending identity. Keep the secret private and rotate it in both Apps Script Script Properties and the backend environment if exposed. Do not use an Apps Script `/dev` test URL in production. If an SMTP server accepts a message but its success response is lost, the fallback can cause a duplicate email; SMTP success is recorded immediately to avoid retrying successful sends.
 

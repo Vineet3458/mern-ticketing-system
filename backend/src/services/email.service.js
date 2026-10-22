@@ -90,9 +90,14 @@ const sendViaAppsScript = async ({ to, subject, html, ticketNumber }) => {
     }),
     signal: AbortSignal.timeout(20_000),
   });
-  const result = await response.json();
+  let result;
+  try {
+    result = await response.json();
+  } catch {
+    throw new Error(`Apps Script returned a non-JSON response (HTTP ${response.status})`);
+  }
   if (!response.ok || result.success !== true) {
-    throw new Error(result.message || `Apps Script returned HTTP ${response.status}`);
+    throw new Error(result.message || result.error || `Apps Script returned HTTP ${response.status}`);
   }
 
   return { messageId: result.messageId || `apps_script_${Date.now()}` };

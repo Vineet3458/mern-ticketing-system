@@ -104,4 +104,26 @@ describe('Google Apps Script email fallback', () => {
     expect(result.success).toBe(false);
     expect(result.error).toContain('Google Apps Script fallback failed (Unauthorized)');
   });
+
+  it('reports an Apps Script error field when the script rejects the request', async () => {
+    env.email.appsScriptUrl = 'https://script.google.com/macros/s/example/exec';
+    env.email.appsScriptSecret = 'test-secret';
+    env.email.gmailUser = '';
+    env.email.gmailAppPassword = '';
+    vi.spyOn(EmailEvent, 'create').mockResolvedValue({});
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ success: false, error: 'Daily email quota exceeded' }),
+    }));
+
+    const result = await sendRawEmail({
+      to: 'customer@example.com',
+      subject: 'Ticket update',
+      html: '<p>Your ticket was updated.</p>',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Daily email quota exceeded');
+  });
 });
