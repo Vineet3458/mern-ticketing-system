@@ -1,16 +1,21 @@
 services:
   - type: web
-    name: mern-ticketing-system
+    name: mern-ticketing-api
     runtime: node
     plan: free
-    buildCommand: npm ci --prefix backend && npm ci --prefix frontend && npm run build --prefix frontend
-    startCommand: npm start --prefix backend
+    rootDir: backend
+    buildCommand: npm ci
+    startCommand: npm start
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production
       - key: NODE_VERSION
         value: 22.14.0
+      - key: SERVE_FRONTEND
+        value: "false"
+      - key: CLIENT_URL
+        value: https://mern-ticketing-system-1.onrender.com
       - key: MONGO_URI
         sync: false
       - key: JWT_ACCESS_SECRET
@@ -19,3 +24,15 @@ services:
         generateValue: true
       - key: GMAIL_IMAP_ENABLED
         value: "false"
+  - type: static
+    name: mern-ticketing-frontend
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_BACKEND_URL
+        value: https://mern-ticketing-system-qqpf.onrender.com
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

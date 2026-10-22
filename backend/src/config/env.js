@@ -18,6 +18,7 @@ const clientUrls = (
 export const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
   port: Number(process.env.PORT) || 5000,
+  serveFrontend: process.env.SERVE_FRONTEND !== 'false',
   clientUrl: clientUrls[0],
   clientUrls,
   mongoUri: process.env.MONGO_URI,

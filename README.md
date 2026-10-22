@@ -143,16 +143,17 @@ The Apps Script executes under the Google account that deployed it and uses that
 
 ## Deploying to Render
 
-The repository includes a Render Blueprint in `render.yaml`. It deploys one Node web service that builds the Vite frontend, serves it from Express, and runs the API and Socket.IO on the same origin.
+The repository includes a Render Blueprint in `render.yaml` for separate services: a Node web service for the Express API and Socket.IO, and a Static Site for the Vite frontend.
 
-1. Push the repository to GitHub and create a **Blueprint** in Render for that repository. Keep the repository root as the blueprint directory.
-2. Set `MONGO_URI` to a production MongoDB Atlas connection string when Render prompts for the unsynced value. The Blueprint generates separate access-token and refresh-token secrets.
-3. Set `GOOGLE_APPS_SCRIPT_URL` and `EMAIL_API_SECRET` in the Render service environment to enable Apps Script as the automatic fallback when SMTP is unavailable. Set `GMAIL_USER`, `GMAIL_APP_PASSWORD`, and `EMAIL_FROM` to enable primary SMTP delivery. `GMAIL_IMAP_ENABLED` defaults to `false`; continuous IMAP polling should only be enabled on an always-on service.
-4. Deploy. Render assigns the service URL, which is used automatically for CORS and Socket.IO. The health check is `/api/health`.
+1. Push the latest code to GitHub and create/update the Render **Blueprint** from the repository root. The Blueprint sets the backend and frontend root directories separately.
+2. Set the prompted `MONGO_URI` to a production MongoDB Atlas connection string. The Blueprint generates separate access-token and refresh-token secrets.
+3. Set the backend `CLIENT_URL` to `https://mern-ticketing-system-1.onrender.com`. Set the frontend `VITE_BACKEND_URL` to `https://mern-ticketing-system-qqpf.onrender.com`, without `/api`.
+4. Optionally configure `GOOGLE_APPS_SCRIPT_URL` and `EMAIL_API_SECRET` for outbound email fallback, or Gmail SMTP credentials. `GMAIL_IMAP_ENABLED` defaults to `false`; continuous IMAP polling should only be enabled on an always-on service.
+5. Deploy both services. Check the backend `/api/health` URL, then open the frontend URL.
 
-The free Render web service may spin down after inactivity, so its first request can be delayed; use an always-on plan for continuously available Socket.IO and IMAP processing. The email queue remains in-memory and best-effort, so a process restart can discard queued email.
+The backend service sets `SERVE_FRONTEND=false`, so it does not require `frontend/dist`. The Static Site serves the frontend and rewrites client-side routes to `index.html`. The free Render web service may spin down after inactivity; use an always-on plan for continuously available Socket.IO or IMAP polling. The email queue remains in-memory and best-effort, so a process restart can discard queued email.
 
-If you deploy the frontend and backend as separate services, set `VITE_BACKEND_URL` in the frontend host's environment settings to the backend's public origin (for example, `https://your-api.onrender.com`, without `/api`) and redeploy the frontend. Set `CLIENT_URL` on the backend service to the frontend's exact public origin (for example, `https://your-frontend.onrender.com`) so API and Socket.IO requests pass CORS checks. Multiple frontend origins can be comma-separated. For local development, copy `frontend/.env.example` to `frontend/.env` and set the backend origin there. The frontend connects directly to that URL; no Vite proxy is used. Restart Vite after changing the variable. `VITE_*` values are embedded in the browser bundle, so never put secrets in frontend environment variables.
+For local development, copy `frontend/.env.example` to `frontend/.env` and set the backend origin there. The frontend connects directly to that URL; no Vite proxy is used. Restart Vite after changing the variable. `VITE_*` values are embedded in the browser bundle, so never put secrets in frontend environment variables.
 
 ### 3. Frontend Setup
 In a new terminal window:
