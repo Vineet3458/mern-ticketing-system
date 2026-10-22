@@ -31,6 +31,18 @@ export const LoginPage = () => {
     const result = await dispatch(loginPassword({ email: email.trim(), password }));
     if (!result.error) {
       navigate('/dashboard');
+    } else if (result.payload && typeof result.payload === 'string' && result.payload.includes('not verified')) {
+      const devOtp = sessionStorage.getItem('lastDevOtp');
+      setTimeout(() => {
+        navigate('/verify-otp', {
+          state: {
+            email: email.trim(),
+            identifier: email.trim(),
+            type: 'register',
+            devOtp,
+          },
+        });
+      }, 1200);
     }
   };
 
@@ -47,6 +59,7 @@ export const LoginPage = () => {
 
     const result = await dispatch(requestLoginOtp(payload));
     if (!result.error) {
+      const devOtp = result.payload?.devOtp;
       dispatch(setPendingEmail(targetIdentifier));
       setOtpSentMsg(
         isPhoneMode
@@ -59,6 +72,7 @@ export const LoginPage = () => {
             identifier: targetIdentifier,
             type: 'login',
             method: isPhoneMode ? 'phone' : 'email',
+            devOtp,
           },
         });
       }, 700);

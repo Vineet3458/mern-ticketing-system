@@ -60,8 +60,9 @@ export const RegisterPage = () => {
     dispatch(clearError());
     const result = await dispatch(registerUser({ name, email, phone, password, role }));
     if (!result.error) {
+      const devOtp = result.payload?.data?.devOtp || result.payload?.devOtp;
       dispatch(setPendingEmail(email));
-      navigate('/verify-otp', { state: { email, type: 'register' } });
+      navigate('/verify-otp', { state: { email, type: 'register', devOtp } });
     }
   };
 

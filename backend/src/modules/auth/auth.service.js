@@ -74,7 +74,7 @@ export const authService = {
       email: user.email,
       name: user.name,
       message: 'Registration successful. A verification OTP has been dispatched to your mobile phone and email.',
-      ...(env.isTest ? { devOtp: otp } : {}),
+      ...((env.isDev || env.isTest) ? { devOtp: otp } : {}),
     };
   },
 
@@ -175,7 +175,13 @@ export const authService = {
 
       emailService.queueOTP(normEmail, user.name, otp);
 
-      throw ApiError.forbidden('Account is not verified yet. A new OTP has been sent to your email.');
+      const err = ApiError.forbidden(
+        (env.isDev || env.isTest)
+          ? `Account is not verified yet. Verification OTP: ${otp}`
+          : 'Account is not verified yet. A new OTP has been sent to your email.'
+      );
+      if (env.isDev || env.isTest) err.devOtp = otp;
+      throw err;
     }
 
     // Reset failed login counter
@@ -254,7 +260,7 @@ export const authService = {
       message: `Login OTP sent successfully to ${recipientText}`,
       email: user.email,
       phone: user.phone,
-      ...(env.isTest ? { devOtp: otp } : {}),
+      ...((env.isDev || env.isTest) ? { devOtp: otp } : {}),
     };
   },
 
@@ -395,7 +401,7 @@ export const authService = {
 
     return {
       message: 'If an account exists with this email, a reset OTP has been sent to your registered mobile phone and email.',
-      ...(env.isTest ? { devOtp: otp } : {}),
+      ...((env.isDev || env.isTest) ? { devOtp: otp } : {}),
     };
   },
 
@@ -464,7 +470,7 @@ export const authService = {
     return {
       message: `OTP sent to ${normPhone}. Check your messages.`,
       phone: normPhone,
-      ...(env.isTest ? { devOtp: otp, smsMessageId: smsResult.messageId } : {}),
+      ...((env.isDev || env.isTest) ? { devOtp: otp, smsMessageId: smsResult.messageId } : {}),
     };
   },
 

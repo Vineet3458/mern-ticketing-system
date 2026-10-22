@@ -16,7 +16,9 @@ import {
 import { ApiError } from '../../utils/ApiError.js';
 import { emailService } from '../../services/email.service.js';
 import { ioService } from '../../services/socket.service.js';
+import { logger } from '../../utils/logger.js';
 import sanitizeHtml from 'sanitize-html';
+
 
 const sanitizeText = (txt = '') =>
   sanitizeHtml(txt, {
@@ -25,6 +27,76 @@ const sanitizeText = (txt = '') =>
   });
 
 export const ticketService = {
+  // ─── Internal helper: pick the agent with the fewest active tickets ──────
+  async _autoAssignAgent(ticket) {
+    try {
+      // Fetch all verified agents and admins
+      const agents = await User.find({
+        role: { $in: [ROLES.AGENT, ROLES.ADMIN] },
+        isVerified: true,
+      }).select('_id name email role');
+
+      if (!agents.length) {
+        logger.info(`[AutoAssign] No agents available — ticket ${ticket.ticketNumber} stays unassigned`);
+        return null;
+      }
+
+      // Count active (non-terminal) tickets per agent
+      const activeStatuses = [
+        TICKET_STATUS.OPEN,
+        TICKET_STATUS.IN_PROGRESS,
+        TICKET_STATUS.REOPENED,
+        TICKET_STATUS.PENDING,
+      ];
+
+      const workloads = await Promise.all(
+        agents.map(async (agent) => ({
+          agent,
+          count: await Ticket.countDocuments({
+            assignedTo: agent._id,
+            status: { $in: activeStatuses },
+          }),
+        }))
+      );
+
+      // Sort by workload ascending; on tie keep DB insertion order (stable)
+      workloads.sort((a, b) => a.count - b.count);
+      const { agent } = workloads[0];
+
+      // Assign the ticket
+      ticket.assignedTo = agent._id;
+      ticket.assignedAt = new Date();
+      await ticket.save();
+
+      // Log the auto-assignment activity
+      await TicketActivity.create({
+        ticketId: ticket._id,
+        actorId: agent._id,
+        actorName: 'System',
+        action: 'ticket_auto_assigned',
+        oldValue: 'Unassigned',
+        newValue: agent.name,
+        metadata: {
+          strategy: 'least_workload',
+          agentWorkload: workloads[0].count,
+        },
+      });
+
+      // Notify the assigned agent by email
+      emailService.queueTicketAssigned(ticket, agent);
+
+      logger.info(
+        `[AutoAssign] ✅ Ticket ${ticket.ticketNumber} auto-assigned to ${agent.name} (${agent.email}) — workload: ${workloads[0].count} active tickets`
+      );
+
+      return agent;
+    } catch (err) {
+      // Auto-assignment failure must never block ticket creation
+      logger.error(`[AutoAssign] ❌ Failed to auto-assign ticket ${ticket.ticketNumber}:`, err.message);
+      return null;
+    }
+  },
+
   async createTicket({ user, subject, description, category, priority, attachments = [] }) {
     const ticketNumber = await getNextTicketNumber();
 
@@ -77,6 +149,9 @@ export const ticketService = {
     // Queue confirmation email to requester
     emailService.queueTicketCreated(ticket, user);
 
+    // Auto-assign to the agent with the least active workload
+    await this._autoAssignAgent(ticket);
+
     // Broadcast to agents / admin
     ioService.emitTicketStatusUpdated(ticket._id.toString(), {
       ticketId: ticket._id.toString(),
@@ -85,8 +160,14 @@ export const ticketService = {
       action: 'created',
     });
 
-    return ticket;
+    // Return fully-populated ticket so caller gets assignedTo populated
+    const populatedTicket = await Ticket.findById(ticket._id)
+      .populate('requesterId', 'name email phone role')
+      .populate('assignedTo', 'name email role');
+
+    return populatedTicket;
   },
+
 
   async listTickets({ user, query }) {
     const {

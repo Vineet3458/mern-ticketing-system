@@ -22,13 +22,16 @@ export const env = {
     maxAttempts: Number(process.env.OTP_MAX_ATTEMPTS) || 5,
   },
   email: {
-    // Resend API key — get yours free at https://resend.com
-    resendApiKey: process.env.RESEND_API_KEY || '',
-    // "From" address — must be a verified domain in your Resend account
-    // In dev you can use: onboarding@resend.dev (works without domain verification)
-    from: process.env.EMAIL_FROM || 'BitMax Support <onboarding@resend.dev>',
+    // Gmail SMTP via Nodemailer
+    // 1. Enable 2-Step Verification on your Google account
+    // 2. Go to https://myaccount.google.com/apppasswords → create App Password
+    // 3. Set GMAIL_USER=your@gmail.com and GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
+    gmailUser: process.env.GMAIL_USER || '',
+    gmailAppPassword: process.env.GMAIL_APP_PASSWORD || '',
+    from: process.env.EMAIL_FROM || `BitMax Support <${process.env.GMAIL_USER || 'noreply@bitmax.local'}>`,
   },
   isProd: process.env.NODE_ENV === 'production',
+  isDev: process.env.NODE_ENV !== 'production',
   isTest: process.env.NODE_ENV === 'test',
 };
 

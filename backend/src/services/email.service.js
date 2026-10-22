@@ -1,4 +1,4 @@
-import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
 import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 import { EmailEvent } from '../database/index.js';
@@ -13,27 +13,62 @@ import {
 } from '../templates/email/index.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Resend client singleton — created once on first use
+// Nodemailer transporter singleton — Gmail SMTP via App Password
 // ─────────────────────────────────────────────────────────────────────────────
-let resendClient = null;
+let transporter = null;
 
-const getResendClient = () => {
-  if (resendClient) return resendClient;
+const getTransporter = () => {
+  if (transporter) return transporter;
 
-  if (!env.email.resendApiKey) {
-    logger.warn('[Resend] ⚠️  RESEND_API_KEY is not set.');
-    logger.warn('[Resend] 📝 Get a free API key at https://resend.com and add it to .env as RESEND_API_KEY');
-    logger.warn('[Resend] 📧 Emails will be skipped until the key is configured.');
+  const { gmailUser, gmailAppPassword } = env.email;
+
+  if (!gmailUser || !gmailAppPassword || gmailAppPassword === 'your_16_char_app_password_here') {
+    logger.warn('╔══════════════════════════════════════════════════════════');
+    logger.warn('║  [Email] ⚠️  Gmail SMTP not configured — emails will be');
+    logger.warn('║  logged to console instead of sent.');
+    logger.warn('║');
+    logger.warn('║  To enable real email delivery:');
+    logger.warn('║  1. Enable 2-Step Verification on your Google account');
+    logger.warn('║  2. Visit https://myaccount.google.com/apppasswords');
+    logger.warn('║  3. Create an App Password for "Mail"');
+    logger.warn('║  4. Set in .env:');
+    logger.warn('║     GMAIL_USER=your@gmail.com');
+    logger.warn('║     GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx');
+    logger.warn('╚══════════════════════════════════════════════════════════');
     return null;
   }
 
-  resendClient = new Resend(env.email.resendApiKey);
-  logger.info('[Resend] ✅ Resend client initialized successfully');
-  return resendClient;
+  transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: gmailUser,
+      pass: gmailAppPassword.replace(/\s/g, ''), // strip spaces from app password
+    },
+  });
+
+  logger.info(`[Email] ✅ Nodemailer Gmail transporter initialized (${gmailUser})`);
+  return transporter;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Core send function
+// Console fallback — prints email content visibly in dev when SMTP not set up
+// ─────────────────────────────────────────────────────────────────────────────
+const logEmailToConsole = ({ to, subject, html, ticketNumber }) => {
+  const previewText = html
+    ? html.replace(/<[^>]+>/g, ' ').replace(/\s{2,}/g, ' ').trim().slice(0, 400)
+    : '(no body)';
+
+  logger.warn('╔══════════════════════════════════════════════════════════');
+  logger.warn('║  [DEV EMAIL — printed to console, SMTP not configured]');
+  logger.warn(`║  📬 To      : ${Array.isArray(to) ? to.join(', ') : to}`);
+  logger.warn(`║  📌 Subject : ${subject}`);
+  if (ticketNumber) logger.warn(`║  🎫 Ticket  : ${ticketNumber}`);
+  logger.warn(`║  📝 Preview : ${previewText}...`);
+  logger.warn('╚══════════════════════════════════════════════════════════');
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Core send function — used by the queue handler below
 // ─────────────────────────────────────────────────────────────────────────────
 export const sendRawEmail = async ({
   to,
@@ -41,52 +76,56 @@ export const sendRawEmail = async ({
   html,
   ticketNumber = null,
   ticketId = null,
-  headers = {},
 }) => {
-  const client = getResendClient();
+  const transport = getTransporter();
+  const toList = Array.isArray(to) ? to : [to];
 
-  // If no API key is configured, log and skip gracefully — never crash
-  if (!client) {
-    logger.warn(`[Resend] 📭 Email skipped (no API key) — To: ${to} | Subject: "${subject}"`);
-    return { success: false, error: 'RESEND_API_KEY not configured' };
-  }
+  // ── No SMTP configured: log to console and persist as skipped_dev ──────────
+  if (!transport) {
+    logEmailToConsole({ to, subject, html, ticketNumber });
 
-  try {
-    // Build the final subject with ticket number prefix when applicable
-    const finalSubject =
-      ticketNumber && !subject.includes(ticketNumber)
-        ? `[${ticketNumber}] ${subject}`
-        : subject;
-
-    // Build custom email headers for threading in email clients
-    const customHeaders = { ...headers };
-    if (ticketNumber) {
-      customHeaders['X-Ticket-Number'] = ticketNumber;
-      customHeaders['References'] = `<ticket-${ticketNumber}@bitmax.local>`;
-      customHeaders['In-Reply-To'] = `<ticket-${ticketNumber}@bitmax.local>`;
-    }
-
-    const { data, error } = await client.emails.send({
-      from: env.email.from,
-      to: Array.isArray(to) ? to : [to],
-      reply_to: ticketNumber
-        ? `BitMax Support <support+${ticketNumber}@bitmax.local>`
-        : env.email.from,
-      subject: finalSubject,
-      html,
-      headers: customHeaders,
+    await EmailEvent.create({
+      messageId: `dev_console_${Date.now()}`,
+      ticketId,
+      direction: EMAIL_DIRECTION.OUTBOUND,
+      status: EMAIL_STATUS.SKIPPED_DEV,
+      error: 'Gmail SMTP not configured — see console for email content',
+      payload: { to, subject, ticketNumber },
+      processedAt: new Date(),
     });
 
-    if (error) {
-      throw new Error(error.message || JSON.stringify(error));
-    }
+    return { success: true, skipped: true, reason: 'smtp_not_configured' };
+  }
 
-    logger.info(`[Resend] ✅ Email sent — To: ${to} | Subject: "${finalSubject}" | ID: ${data.id}`);
+  // ── Build final subject with ticket number prefix ──────────────────────────
+  const finalSubject =
+    ticketNumber && !subject.includes(ticketNumber)
+      ? `[${ticketNumber}] ${subject}`
+      : subject;
 
-    // Persist outbound email event in the database
+  try {
+    const info = await transport.sendMail({
+      from: env.email.from,
+      to: toList.join(', '),
+      subject: finalSubject,
+      html,
+      // Email threading headers (for ticket conversations)
+      headers: ticketNumber
+        ? {
+            'X-Ticket-Number': ticketNumber,
+            References: `<ticket-${ticketNumber}@bitmax.support>`,
+            'In-Reply-To': `<ticket-${ticketNumber}@bitmax.support>`,
+          }
+        : {},
+    });
+
+    logger.info(
+      `[Email] ✅ Sent — To: ${toList.join(', ')} | Subject: "${finalSubject}" | MsgID: ${info.messageId}`
+    );
+
     await EmailEvent.create({
-      providerMessageId: data.id,
-      messageId: data.id,
+      providerMessageId: info.messageId,
+      messageId: info.messageId,
       ticketId,
       direction: EMAIL_DIRECTION.OUTBOUND,
       status: EMAIL_STATUS.SENT,
@@ -94,37 +133,38 @@ export const sendRawEmail = async ({
       processedAt: new Date(),
     });
 
-    return { success: true, id: data.id };
+    return { success: true, id: info.messageId };
   } catch (err) {
-    logger.error(`[Resend] ❌ Failed to send email to ${to}:`, err.message);
+    logger.error(`[Email] ❌ Failed to send to ${toList.join(', ')}:`, err.message);
 
-    // Persist the failure for audit purposes
     await EmailEvent.create({
       messageId: `failed_${Date.now()}`,
       ticketId,
       direction: EMAIL_DIRECTION.OUTBOUND,
       status: EMAIL_STATUS.FAILED,
       error: err.message,
-      payload: { to, subject, ticketNumber },
+      payload: { to, subject: finalSubject, ticketNumber },
       processedAt: new Date(),
     });
 
-    // Never propagate — email failure should never crash an HTTP request
+    // Never propagate — email failure must never crash an HTTP request
     return { success: false, error: err.message };
   }
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Background queue handler — processes jobs from emailQueue
+// Each job type maps to a template and a sendRawEmail call
 // ─────────────────────────────────────────────────────────────────────────────
 emailQueue.setHandler(async (job) => {
   const { type, payload } = job.data;
 
   switch (type) {
+    // ── Customer: ticket confirmation ─────────────────────────────────────────
     case 'TICKET_CREATED':
       await sendRawEmail({
         to: payload.to,
-        subject: `[Created] ${payload.subject}`,
+        subject: `Your ticket has been received: ${payload.subject}`,
         html: ticketCreatedTemplate({
           ticketNumber: payload.ticketNumber,
           subject: payload.subject,
@@ -138,10 +178,11 @@ emailQueue.setHandler(async (job) => {
       });
       break;
 
+    // ── Agent: new ticket assignment notification ─────────────────────────────
     case 'TICKET_ASSIGNED':
       await sendRawEmail({
         to: payload.to,
-        subject: `[Assigned] ${payload.subject}`,
+        subject: `New ticket assigned to you: ${payload.subject}`,
         html: ticketAssignedTemplate({
           ticketNumber: payload.ticketNumber,
           subject: payload.subject,
@@ -153,10 +194,11 @@ emailQueue.setHandler(async (job) => {
       });
       break;
 
+    // ── Ticket reply notification ─────────────────────────────────────────────
     case 'TICKET_REPLY':
       await sendRawEmail({
         to: payload.to,
-        subject: `[Reply] ${payload.subject}`,
+        subject: `New reply on your ticket: ${payload.subject}`,
         html: ticketReplyTemplate({
           ticketNumber: payload.ticketNumber,
           subject: payload.subject,
@@ -169,10 +211,11 @@ emailQueue.setHandler(async (job) => {
       });
       break;
 
+    // ── Status change notification ────────────────────────────────────────────
     case 'STATUS_CHANGED':
       await sendRawEmail({
         to: payload.to,
-        subject: `[Status: ${payload.status}] ${payload.subject}`,
+        subject: `Ticket status updated [${payload.status}]: ${payload.subject}`,
         html: ticketStatusChangedTemplate({
           ticketNumber: payload.ticketNumber,
           subject: payload.subject,
@@ -185,6 +228,7 @@ emailQueue.setHandler(async (job) => {
       });
       break;
 
+    // ── OTP verification email ────────────────────────────────────────────────
     case 'OTP':
       await sendRawEmail({
         to: payload.to,
@@ -206,6 +250,9 @@ emailQueue.setHandler(async (job) => {
 // Public service API — called by ticket & auth services
 // ─────────────────────────────────────────────────────────────────────────────
 export const emailService = {
+  /**
+   * Queue a ticket-created confirmation email to the customer.
+   */
   queueTicketCreated: (ticket, requester) => {
     emailQueue.add('send_ticket_created', {
       type: 'TICKET_CREATED',
@@ -221,6 +268,9 @@ export const emailService = {
     });
   },
 
+  /**
+   * Queue a ticket-assigned notification email to the assigned agent.
+   */
   queueTicketAssigned: (ticket, agent) => {
     if (!agent?.email) return;
     emailQueue.add('send_ticket_assigned', {
@@ -235,6 +285,9 @@ export const emailService = {
     });
   },
 
+  /**
+   * Queue a reply notification email to the recipient (customer or agent).
+   */
   queueTicketReply: (ticket, reply, recipientEmail) => {
     if (!recipientEmail) return;
     emailQueue.add('send_ticket_reply', {
@@ -250,6 +303,9 @@ export const emailService = {
     });
   },
 
+  /**
+   * Queue a status-change notification email to the recipient.
+   */
   queueStatusChanged: (ticket, actorName, recipientEmail) => {
     if (!recipientEmail) return;
     emailQueue.add('send_status_changed', {
@@ -265,6 +321,9 @@ export const emailService = {
     });
   },
 
+  /**
+   * Queue an OTP verification email.
+   */
   queueOTP: (to, name, otp) => {
     emailQueue.add('send_otp', {
       type: 'OTP',

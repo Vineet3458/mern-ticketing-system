@@ -19,7 +19,7 @@ export const TICKET_PRIORITY = Object.freeze({
 export const MESSAGE_TYPE = Object.freeze({ PUBLIC: 'public', INTERNAL: 'internal', SYSTEM: 'system' });
 export const MESSAGE_SOURCE = Object.freeze({ WEB: 'web', EMAIL: 'email', SYSTEM: 'system' });
 export const EMAIL_DIRECTION = Object.freeze({ INBOUND: 'inbound', OUTBOUND: 'outbound' });
-export const EMAIL_STATUS = Object.freeze({ QUEUED: 'queued', SENT: 'sent', PROCESSED: 'processed', FAILED: 'failed', DUPLICATE: 'duplicate', IGNORED: 'ignored' });
+export const EMAIL_STATUS = Object.freeze({ QUEUED: 'queued', SENT: 'sent', PROCESSED: 'processed', FAILED: 'failed', DUPLICATE: 'duplicate', IGNORED: 'ignored', SKIPPED_DEV: 'skipped_dev' });
 
 // Valid ticket state transitions (enforced in the ticket service - next step)
 export const STATUS_TRANSITIONS = Object.freeze({
