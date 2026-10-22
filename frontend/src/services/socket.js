@@ -4,7 +4,8 @@ let socket = null;
 
 export const getSocket = () => {
   if (!socket) {
-    socket = io(window.location.origin, {
+    const backendUrl = import.meta.env.VITE_BACKEND_URL?.replace(/\/+$/, '') || window.location.origin;
+    socket = io(backendUrl, {
       transports: ['websocket', 'polling'],
       autoConnect: true,
       reconnection: true,

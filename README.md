@@ -140,6 +140,8 @@ The repository includes a Render Blueprint in `render.yaml`. It deploys one Node
 
 The free Render web service may spin down after inactivity, so its first request can be delayed; use an always-on plan for continuously available Socket.IO and IMAP processing. The email queue remains in-memory and best-effort, so a process restart can discard queued email.
 
+If you deploy the frontend and backend as separate services, set `VITE_BACKEND_URL` in the frontend host's environment settings to the backend's public origin (for example, `https://your-api.onrender.com`, without `/api`) and redeploy the frontend. Set `CLIENT_URL` on the backend service to the frontend's public origin so API and Socket.IO requests pass CORS checks. For local development, copy `frontend/.env.example` to `frontend/.env`, put the backend origin in `VITE_BACKEND_URL` only if you are not using the Vite proxy, and restart Vite after changing it. `VITE_*` values are embedded in the browser bundle, so never put secrets in frontend environment variables.
+
 ### 3. Frontend Setup
 In a new terminal window:
 ```bash

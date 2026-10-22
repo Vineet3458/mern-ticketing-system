@@ -1,7 +1,9 @@
 import axios from 'axios';
 
+const backendUrl = import.meta.env.VITE_BACKEND_URL?.replace(/\/+$/, '');
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: backendUrl ? `${backendUrl}/api` : '/api',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -62,8 +64,8 @@ api.interceptors.response.use(
 
       try {
         const storedRefreshToken = localStorage.getItem('refreshToken');
-        const res = await axios.post(
-          '/api/auth/refresh-token',
+        const res = await api.post(
+          '/auth/refresh-token',
           { refreshToken: storedRefreshToken },
           { withCredentials: true }
         );
