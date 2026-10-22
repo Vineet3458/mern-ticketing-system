@@ -41,6 +41,9 @@ const getTransporter = () => {
 
   transporter = nodemailer.createTransport({
     service: 'gmail',
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
     auth: {
       user: gmailUser,
       pass: gmailAppPassword.replace(/\s/g, ''), // strip spaces from app password
@@ -68,6 +71,33 @@ const logEmailToConsole = ({ to, subject, html, ticketNumber, sensitive = false 
   logger.warn('╚══════════════════════════════════════════════════════════');
 };
 
+const sendViaAppsScript = async ({ to, subject, html, ticketNumber }) => {
+  const { appsScriptUrl, appsScriptSecret } = env.email;
+  if (!appsScriptUrl) throw new Error('Google Apps Script fallback is not configured');
+  if (!appsScriptSecret) {
+    throw new Error('EMAIL_API_SECRET must be configured when GOOGLE_APPS_SCRIPT_URL is set');
+  }
+
+  const response = await fetch(appsScriptUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      secret: appsScriptSecret,
+      to: Array.isArray(to) ? to.join(', ') : to,
+      subject,
+      html,
+      replyTo: ticketNumber ? env.email.inboundAddress : '',
+    }),
+    signal: AbortSignal.timeout(20_000),
+  });
+  const result = await response.json();
+  if (!response.ok || result.success !== true) {
+    throw new Error(result.message || `Apps Script returned HTTP ${response.status}`);
+  }
+
+  return { messageId: result.messageId || `apps_script_${Date.now()}` };
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Core send function — used by the queue handler below
 // ─────────────────────────────────────────────────────────────────────────────
@@ -79,11 +109,49 @@ export const sendRawEmail = async ({
   ticketId = null,
   sensitive = false,
 }) => {
-  const transport = getTransporter();
   const toList = Array.isArray(to) ? to : [to];
 
-  // ── No SMTP configured: log to console and persist as skipped_dev ──────────
+  const finalSubject =
+    ticketNumber && !subject.includes(ticketNumber)
+      ? `[${ticketNumber}] ${subject}`
+      : subject;
+
+  const transport = getTransporter();
   if (!transport) {
+    if (env.email.appsScriptUrl) {
+      try {
+        const { messageId } = await sendViaAppsScript({
+          to,
+          subject: finalSubject,
+          html,
+          ticketNumber,
+        });
+        logger.info(`[Email] ✅ Sent via Google Apps Script fallback — To: ${toList.join(', ')}`);
+        await EmailEvent.create({
+          providerMessageId: messageId,
+          messageId,
+          ticketId,
+          direction: EMAIL_DIRECTION.OUTBOUND,
+          status: EMAIL_STATUS.SENT,
+          payload: { to, subject: finalSubject, ticketNumber },
+          processedAt: new Date(),
+        });
+        return { success: true, id: messageId };
+      } catch (err) {
+        logger.error(`[Email] ❌ SMTP unavailable and Google Apps Script fallback failed: ${err.message}`);
+        await EmailEvent.create({
+          messageId: `failed_${Date.now()}`,
+          ticketId,
+          direction: EMAIL_DIRECTION.OUTBOUND,
+          status: EMAIL_STATUS.FAILED,
+          error: err.message,
+          payload: { to, subject: finalSubject, ticketNumber },
+          processedAt: new Date(),
+        });
+        return { success: false, error: err.message };
+      }
+    }
+
     logEmailToConsole({ to, subject, html, ticketNumber, sensitive });
 
     await EmailEvent.create({
@@ -100,12 +168,6 @@ export const sendRawEmail = async ({
 
     return { success: true, skipped: true, reason: 'smtp_not_configured' };
   }
-
-  // ── Build final subject with ticket number prefix ──────────────────────────
-  const finalSubject =
-    ticketNumber && !subject.includes(ticketNumber)
-      ? `[${ticketNumber}] ${subject}`
-      : subject;
 
   try {
     const info = await transport.sendMail({
@@ -141,6 +203,31 @@ export const sendRawEmail = async ({
     return { success: true, id: info.messageId };
   } catch (err) {
     logger.error(`[Email] ❌ Failed to send to ${toList.join(', ')}:`, err.message);
+
+    if (env.email.appsScriptUrl) {
+      try {
+        const { messageId } = await sendViaAppsScript({
+          to,
+          subject: finalSubject,
+          html,
+          ticketNumber,
+        });
+        logger.info(`[Email] ✅ Sent via Google Apps Script fallback — To: ${toList.join(', ')}`);
+        await EmailEvent.create({
+          providerMessageId: messageId,
+          messageId,
+          ticketId,
+          direction: EMAIL_DIRECTION.OUTBOUND,
+          status: EMAIL_STATUS.SENT,
+          payload: { to, subject: finalSubject, ticketNumber },
+          processedAt: new Date(),
+        });
+        return { success: true, id: messageId, fallback: 'google_apps_script' };
+      } catch (fallbackError) {
+        logger.error(`[Email] ❌ Google Apps Script fallback failed for ${toList.join(', ')}:`, fallbackError.message);
+        err = new Error(`SMTP failed (${err.message}); Google Apps Script fallback failed (${fallbackError.message})`);
+      }
+    }
 
     await EmailEvent.create({
       messageId: `failed_${Date.now()}`,

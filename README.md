@@ -129,13 +129,25 @@ Backend will start on `http://localhost:5000` with Swagger documentation availab
 
 For Gmail development email, enable IMAP in Gmail settings and configure `GMAIL_USER`, `GMAIL_APP_PASSWORD`, and `EMAIL_FROM` in `backend/.env`. Create a Gmail App Password after enabling 2-Step Verification; use that password for both Nodemailer SMTP and IMAP. Set `GMAIL_IMAP_ENABLED=true` to poll the account's `INBOX` every 60 seconds (customize with `GMAIL_IMAP_POLL_INTERVAL_MS`). Ticket emails use the configured inbox as their Reply-To by default. Replies matching a ticket are stored in MongoDB and appear in the website conversation. Use the existing `POST /api/email/inbound` webhook instead if receiving mail through an external email provider. Only the ticket requester and currently assigned agent can reply by email.
 
+### Google Apps Script outbound email (no SMTP ports)
+
+If the deployment host blocks SMTP ports, use the Apps Script web app provider:
+
+1. Create a Google Apps Script project and copy `apps-script/Code.gs` into its editor.
+2. In **Project Settings → Script properties**, add `EMAIL_API_SECRET` with a long random secret.
+3. Deploy as a **Web app**, executing as your Google account and allowing access to anyone. The shared secret in the request is what authorizes the backend.
+4. Set `GOOGLE_APPS_SCRIPT_URL` to the deployed `/exec` URL and set the same `EMAIL_API_SECRET` in the backend host's environment. The backend tries Nodemailer first and uses Apps Script automatically if SMTP is unconfigured or delivery fails.
+5. Send a test email and check the backend logs and the Apps Script execution log.
+
+The Apps Script executes under the Google account that deployed it and uses that account's Mail quota/sending identity. Keep the secret private and rotate it in both Apps Script Script Properties and the backend environment if exposed. Do not use an Apps Script `/dev` test URL in production. If an SMTP server accepts a message but its success response is lost, the fallback can cause a duplicate email; SMTP success is recorded immediately to avoid retrying successful sends.
+
 ## Deploying to Render
 
 The repository includes a Render Blueprint in `render.yaml`. It deploys one Node web service that builds the Vite frontend, serves it from Express, and runs the API and Socket.IO on the same origin.
 
 1. Push the repository to GitHub and create a **Blueprint** in Render for that repository. Keep the repository root as the blueprint directory.
 2. Set `MONGO_URI` to a production MongoDB Atlas connection string when Render prompts for the unsynced value. The Blueprint generates separate access-token and refresh-token secrets.
-3. Optionally set `GMAIL_USER`, `GMAIL_APP_PASSWORD`, and `EMAIL_FROM` for outbound email. `GMAIL_IMAP_ENABLED` defaults to `false`; continuous IMAP polling should only be enabled on an always-on service.
+3. Set `GOOGLE_APPS_SCRIPT_URL` and `EMAIL_API_SECRET` in the Render service environment to enable Apps Script as the automatic fallback when SMTP is unavailable. Set `GMAIL_USER`, `GMAIL_APP_PASSWORD`, and `EMAIL_FROM` to enable primary SMTP delivery. `GMAIL_IMAP_ENABLED` defaults to `false`; continuous IMAP polling should only be enabled on an always-on service.
 4. Deploy. Render assigns the service URL, which is used automatically for CORS and Socket.IO. The health check is `/api/health`.
 
 The free Render web service may spin down after inactivity, so its first request can be delayed; use an always-on plan for continuously available Socket.IO and IMAP processing. The email queue remains in-memory and best-effort, so a process restart can discard queued email.
