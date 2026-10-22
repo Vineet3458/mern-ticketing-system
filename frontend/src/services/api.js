@@ -1,9 +1,8 @@
 import axios from 'axios';
-
-const backendUrl = import.meta.env.VITE_BACKEND_URL?.replace(/\/+$/, '');
+import { backendOrigin } from './backendUrl.js';
 
 const api = axios.create({
-  baseURL: backendUrl ? `${backendUrl}/api` : '/api',
+  baseURL: backendOrigin ? `${backendOrigin}/api` : '/api',
   headers: {
     'Content-Type': 'application/json',
   },

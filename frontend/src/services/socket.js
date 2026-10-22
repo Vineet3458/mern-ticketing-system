@@ -1,10 +1,11 @@
 import { io } from 'socket.io-client';
+import { backendOrigin } from './backendUrl.js';
 
 let socket = null;
 
 export const getSocket = () => {
   if (!socket) {
-    const backendUrl = import.meta.env.VITE_BACKEND_URL?.replace(/\/+$/, '') || window.location.origin;
+    const backendUrl = backendOrigin || window.location.origin;
     socket = io(backendUrl, {
       transports: ['websocket', 'polling'],
       autoConnect: true,
