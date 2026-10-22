@@ -3,10 +3,10 @@ import { logger } from '../utils/logger.js';
 
 let io = null;
 
-export const initSocket = (httpServer, clientUrl) => {
+export const initSocket = (httpServer, clientUrls) => {
   io = new Server(httpServer, {
     cors: {
-      origin: clientUrl || '*',
+      origin: clientUrls,
       methods: ['GET', 'POST'],
       credentials: true,
     },

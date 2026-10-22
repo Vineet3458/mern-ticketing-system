@@ -6,10 +6,20 @@ for (const key of required) {
   if (!process.env[key]) throw new Error(`Missing required env variable: ${key}`);
 }
 
+const clientUrls = (
+  process.env.CLIENT_URL ||
+  process.env.RENDER_EXTERNAL_URL ||
+  'http://localhost:5173'
+)
+  .split(',')
+  .map((url) => url.trim().replace(/\/+$/, ''))
+  .filter(Boolean);
+
 export const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
   port: Number(process.env.PORT) || 5000,
-  clientUrl: process.env.CLIENT_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5173',
+  clientUrl: clientUrls[0],
+  clientUrls,
   mongoUri: process.env.MONGO_URI,
   jwt: {
     accessSecret: process.env.JWT_ACCESS_SECRET,

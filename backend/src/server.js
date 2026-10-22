@@ -9,7 +9,7 @@ import { startInboundImap } from './services/inboundImap.service.js';
 const start = async () => {
   await connectDB();
   const httpServer = http.createServer(app);
-  initSocket(httpServer, env.clientUrl);
+  initSocket(httpServer, env.clientUrls);
 
   httpServer.listen(env.port, () => {
     logger.info(`Server running on port ${env.port} (${env.nodeEnv})`);
