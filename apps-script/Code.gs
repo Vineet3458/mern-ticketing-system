@@ -1,3 +1,10 @@
+function doGet() {
+  return jsonResponse({
+    success: true,
+    message: 'Ticketing email service is running'
+  });
+}
+
 function doPost(e) {
   try {
     const request = JSON.parse((e && e.postData && e.postData.contents) || '{}');

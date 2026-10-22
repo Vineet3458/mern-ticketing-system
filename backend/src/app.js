@@ -55,6 +55,15 @@ if (env.serveFrontend && existsSync(resolve(frontendDist, 'index.html'))) {
       if (error) next(error);
     });
   });
+} else {
+  app.get('/', (_req, res) => {
+    res.json({
+      success: true,
+      message: 'Ticketing API is running',
+      health: '/api/health',
+      docs: '/api/docs',
+    });
+  });
 }
 
 app.use(notFound);

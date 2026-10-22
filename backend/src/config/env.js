@@ -6,6 +6,9 @@ for (const key of required) {
   if (!process.env[key]) throw new Error(`Missing required env variable: ${key}`);
 }
 
+const isHosted = Boolean(process.env.RENDER_EXTERNAL_URL || process.env.VERCEL);
+const nodeEnv = process.env.NODE_ENV || (isHosted ? 'production' : 'development');
+
 const clientUrls = (
   process.env.CLIENT_URL ||
   process.env.RENDER_EXTERNAL_URL ||
@@ -16,7 +19,7 @@ const clientUrls = (
   .filter(Boolean);
 
 export const env = {
-  nodeEnv: process.env.NODE_ENV || 'development',
+  nodeEnv,
   port: Number(process.env.PORT) || 5000,
   serveFrontend: process.env.SERVE_FRONTEND !== 'false',
   clientUrl: clientUrls[0],
@@ -48,7 +51,7 @@ export const env = {
     imapPort: Number(process.env.GMAIL_IMAP_PORT) || 993,
     imapPollIntervalMs: Number(process.env.GMAIL_IMAP_POLL_INTERVAL_MS) || 60_000,
   },
-  isProd: process.env.NODE_ENV === 'production',
-  isDev: process.env.NODE_ENV !== 'production',
-  isTest: process.env.NODE_ENV === 'test',
+  isProd: nodeEnv === 'production',
+  isDev: nodeEnv === 'development',
+  isTest: nodeEnv === 'test',
 };

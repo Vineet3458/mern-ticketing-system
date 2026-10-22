@@ -21,6 +21,12 @@ const waitFor = async (findResult, timeoutMs = 3000) => {
 };
 
 describe('BitMax Production Ticketing System - Full Test Suite', () => {
+  const emailProviderConfig = {
+    gmailUser: env.email.gmailUser,
+    gmailAppPassword: env.email.gmailAppPassword,
+    appsScriptUrl: env.email.appsScriptUrl,
+    appsScriptSecret: env.email.appsScriptSecret,
+  };
   let customerToken = '';
   let customerId = '';
   let agentToken = '';
@@ -30,6 +36,11 @@ describe('BitMax Production Ticketing System - Full Test Suite', () => {
   let createdTicketNumber = '';
 
   beforeAll(async () => {
+    env.email.gmailUser = '';
+    env.email.gmailAppPassword = '';
+    env.email.appsScriptUrl = '';
+    env.email.appsScriptSecret = '';
+
     if (mongoose.connection.readyState === 0) {
       await connectDB();
     }
@@ -37,6 +48,7 @@ describe('BitMax Production Ticketing System - Full Test Suite', () => {
 
   afterAll(async () => {
     await mongoose.disconnect();
+    Object.assign(env.email, emailProviderConfig);
   });
 
   describe('1. Authentication Flow', () => {
