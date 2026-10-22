@@ -129,6 +129,17 @@ Backend will start on `http://localhost:5000` with Swagger documentation availab
 
 For Gmail development email, enable IMAP in Gmail settings and configure `GMAIL_USER`, `GMAIL_APP_PASSWORD`, and `EMAIL_FROM` in `backend/.env`. Create a Gmail App Password after enabling 2-Step Verification; use that password for both Nodemailer SMTP and IMAP. Set `GMAIL_IMAP_ENABLED=true` to poll the account's `INBOX` every 60 seconds (customize with `GMAIL_IMAP_POLL_INTERVAL_MS`). Ticket emails use the configured inbox as their Reply-To by default. Replies matching a ticket are stored in MongoDB and appear in the website conversation. Use the existing `POST /api/email/inbound` webhook instead if receiving mail through an external email provider. Only the ticket requester and currently assigned agent can reply by email.
 
+## Deploying to Render
+
+The repository includes a Render Blueprint in `render.yaml`. It deploys one Node web service that builds the Vite frontend, serves it from Express, and runs the API and Socket.IO on the same origin.
+
+1. Push the repository to GitHub and create a **Blueprint** in Render for that repository. Keep the repository root as the blueprint directory.
+2. Set `MONGO_URI` to a production MongoDB Atlas connection string when Render prompts for the unsynced value. The Blueprint generates separate access-token and refresh-token secrets.
+3. Optionally set `GMAIL_USER`, `GMAIL_APP_PASSWORD`, and `EMAIL_FROM` for outbound email. `GMAIL_IMAP_ENABLED` defaults to `false`; continuous IMAP polling should only be enabled on an always-on service.
+4. Deploy. Render assigns the service URL, which is used automatically for CORS and Socket.IO. The health check is `/api/health`.
+
+The free Render web service may spin down after inactivity, so its first request can be delayed; use an always-on plan for continuously available Socket.IO and IMAP processing. The email queue remains in-memory and best-effort, so a process restart can discard queued email.
+
 ### 3. Frontend Setup
 In a new terminal window:
 ```bash

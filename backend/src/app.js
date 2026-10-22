@@ -14,8 +14,14 @@ import { errorHandler } from './middleware/errorHandler.js';
 
 import swaggerUi from 'swagger-ui-express';
 import { swaggerDocument } from './docs/swagger.js';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const app = express();
+
+if (process.env.RENDER_EXTERNAL_URL || process.env.VERCEL) {
+  app.set('trust proxy', 1);
+}
 
 app.use(
   helmet({
@@ -39,6 +45,14 @@ app.get('/api/docs.json', (req, res) => res.json(swaggerDocument));
 
 app.use('/api', routes);
 
+const frontendDist = resolve(dirname(fileURLToPath(import.meta.url)), '../../frontend/dist');
+app.use(express.static(frontendDist, { index: false }));
+app.get('*', (req, res, next) => {
+  if (req.path === '/api' || req.path.startsWith('/api/')) return next();
+  return res.sendFile(resolve(frontendDist, 'index.html'), (error) => {
+    if (error) next(error);
+  });
+});
 
 app.use(notFound);
 app.use(errorHandler);

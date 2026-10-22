@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: mern-ticketing-system
+    runtime: node
+    plan: free
+    buildCommand: npm ci --prefix backend && npm ci --prefix frontend && npm run build --prefix frontend
+    startCommand: npm start --prefix backend
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 22.14.0
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: GMAIL_IMAP_ENABLED
+        value: "false"
