@@ -4,7 +4,6 @@ import { ApiError } from '../../utils/ApiError.js';
 import { generateOTP, hashOTP, compareOTP } from '../../utils/otp.js';
 import { generateTokens, verifyRefreshToken } from '../../utils/token.js';
 import { emailService } from '../../services/email.service.js';
-import { smsService } from '../../services/sms.service.js';
 import { assertEmailNotRestricted } from '../../utils/emailRestrictions.js';
 import { normalizePhoneNumber, buildPhoneQuery, formatDisplayPhone } from '../../utils/phoneUtils.js';
 import { env } from '../../config/env.js';
@@ -56,24 +55,14 @@ export const authService = {
       });
     }
 
-    // Send real OTP SMS to mobile phone
-    if (normPhone) {
-      await smsService.sendPhoneOTP({
-        phone: normPhone,
-        otp,
-        name,
-        expiresMinutes: env.otp.expiresMinutes,
-      });
-    }
-
-    // Send verification OTP via email
+    // Registration OTP verifies the email address.
     emailService.queueOTP(normEmail, name, otp);
 
     return {
       userId: user._id,
       email: user.email,
       name: user.name,
-      message: 'Registration successful. A verification OTP has been dispatched to your mobile phone and email.',
+      message: 'Registration successful. A verification OTP has been sent to your email.',
     };
   },
 
@@ -230,22 +219,11 @@ export const authService = {
     user.otpType = 'login';
     await user.save();
 
-    // Send real OTP SMS to user's registered phone
-    if (user.phone) {
-      await smsService.sendPhoneOTP({
-        phone: user.phone,
-        otp,
-        name: user.name,
-        expiresMinutes: env.otp.expiresMinutes,
-      });
-    }
-
-    // Also queue backup email OTP if user has email
-    if (user.email) {
+    if (!phone && user.email) {
       emailService.queueOTP(user.email, user.name, otp);
     }
 
-    const recipientText = user.phone
+    const recipientText = phone
       ? `mobile number ending in ...${user.phone.slice(-4)}`
       : user.email;
 
@@ -253,6 +231,7 @@ export const authService = {
       message: `Login OTP sent successfully to ${recipientText}`,
       email: user.email,
       phone: user.phone,
+      ...((phone && (env.isDev || env.isTest)) ? { testOtp: otp } : {}),
     };
   },
 
@@ -379,20 +358,10 @@ export const authService = {
     user.otpType = 'reset';
     await user.save();
 
-    // Send real OTP SMS if user has mobile phone
-    if (user.phone) {
-      await smsService.sendPhoneOTP({
-        phone: user.phone,
-        otp,
-        name: user.name,
-        expiresMinutes: env.otp.expiresMinutes,
-      });
-    }
-
     emailService.queueOTP(normEmail, user.name, otp);
 
     return {
-      message: 'If an account exists with this email, a reset OTP has been sent to your registered mobile phone and email.',
+      message: 'If an account exists with this email, a reset OTP has been sent to the registered email.',
     };
   },
 
@@ -433,7 +402,7 @@ export const authService = {
 
   /**
    * Send a 6-digit OTP to the user's phone number for mobile verification.
-   * Uses the crypto-backed generateOTP and smsService.
+   * In development, the OTP is returned only so the browser can log it.
    */
   async sendPhoneOtp({ phone, userId }) {
     const normPhone = String(phone).trim();
@@ -451,17 +420,10 @@ export const authService = {
     user.phoneOtpAttempts = 0;
     await user.save();
 
-    const smsResult = await smsService.sendPhoneOTP({
-      phone: normPhone,
-      otp,
-      name: user.name,
-      expiresMinutes: env.otp.expiresMinutes,
-    });
-
     return {
-      message: `OTP sent to ${normPhone}. Check your messages.`,
+      message: `Mobile verification OTP generated for ${normPhone}. Check the browser console.`,
       phone: normPhone,
-      ...((env.isDev || env.isTest) ? { smsMessageId: smsResult.messageId } : {}),
+      ...((env.isDev || env.isTest) ? { testOtp: otp } : {}),
     };
   },
 

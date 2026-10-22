@@ -47,7 +47,11 @@ export const requestLoginOtp = createAsyncThunk(
   async ({ email, phone }, { rejectWithValue }) => {
     try {
       const res = await api.post('/auth/login-otp', { email, phone });
-      return { ...res.data.data, requestedIdentifier: email || phone };
+      const { testOtp, ...data } = res.data.data;
+      if (phone && testOtp) {
+        console.info(`[Mobile login test OTP] ${testOtp}`);
+      }
+      return { ...data, requestedIdentifier: email || phone };
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || 'Failed to send login OTP');
     }

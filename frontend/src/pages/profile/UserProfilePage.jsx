@@ -51,9 +51,48 @@ export const UserProfilePage = () => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [phoneOtp, setPhoneOtp] = useState('');
+  const [phoneOtpRequested, setPhoneOtpRequested] = useState(false);
+  const [phoneVerificationMessage, setPhoneVerificationMessage] = useState('');
+  const [isRequestingPhoneOtp, setIsRequestingPhoneOtp] = useState(false);
+  const [isVerifyingPhoneOtp, setIsVerifyingPhoneOtp] = useState(false);
 
   const showSuccess = (msg) => { setSuccessMsg(msg); setErrorMsg(''); };
   const showError = (msg) => { setErrorMsg(msg); setSuccessMsg(''); };
+
+  const handleRequestPhoneOtp = async () => {
+    setIsRequestingPhoneOtp(true);
+    setPhoneVerificationMessage('');
+    setPhoneOtp('');
+    try {
+      const res = await api.post('/auth/phone/send-otp', { phone: user.phone });
+      if (res.data.data.testOtp) {
+        console.info(`[Mobile verification test OTP] ${res.data.data.testOtp}`);
+      }
+      setPhoneOtpRequested(true);
+      setPhoneVerificationMessage(res.data.message);
+    } catch (err) {
+      showError(err.response?.data?.message || 'Failed to generate mobile verification code.');
+    } finally {
+      setIsRequestingPhoneOtp(false);
+    }
+  };
+
+  const handleVerifyPhoneOtp = async (e) => {
+    e.preventDefault();
+    setIsVerifyingPhoneOtp(true);
+    try {
+      const res = await api.post('/auth/phone/verify-otp', { phone: user.phone, otp: phoneOtp });
+      await dispatch(fetchUserProfile());
+      setPhoneOtpRequested(false);
+      setPhoneOtp('');
+      setPhoneVerificationMessage(res.data.message);
+    } catch (err) {
+      showError(err.response?.data?.message || 'Failed to verify mobile number.');
+    } finally {
+      setIsVerifyingPhoneOtp(false);
+    }
+  };
 
   const handleUpdate = async (e) => {
     e.preventDefault();
@@ -63,6 +102,9 @@ export const UserProfilePage = () => {
     try {
       await api.patch('/users/profile', { name, phone });
       await dispatch(fetchUserProfile());
+      setPhoneOtpRequested(false);
+      setPhoneOtp('');
+      setPhoneVerificationMessage('');
       showSuccess('Profile updated successfully!');
     } catch (err) {
       showError(err.response?.data?.message || 'Failed to update profile.');
@@ -177,6 +219,49 @@ export const UserProfilePage = () => {
           </div>
         </form>
       </div>
+
+      {!user?.isPhoneVerified && (
+        <div className="bg-white rounded-3xl border border-slate-200/80 card-shadow p-6">
+          <h3 className="text-sm font-extrabold text-slate-900 mb-2">Verify Mobile Number</h3>
+          <p className="text-xs text-slate-500 mb-4">
+            Generate a mobile verification code. In development, it will be logged in the browser console.
+          </p>
+          {phoneVerificationMessage && (
+            <p className="text-xs text-emerald-700 mb-3">{phoneVerificationMessage}</p>
+          )}
+          <button
+            type="button"
+            onClick={handleRequestPhoneOtp}
+            disabled={isRequestingPhoneOtp || isVerifyingPhoneOtp}
+            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition-all disabled:opacity-50"
+          >
+            {isRequestingPhoneOtp ? 'Generating...' : 'Generate Verification Code'}
+          </button>
+          {phoneOtpRequested && (
+            <form onSubmit={handleVerifyPhoneOtp} className="mt-4 flex flex-col sm:flex-row gap-2">
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                required
+                maxLength={6}
+                value={phoneOtp}
+                onChange={(e) => setPhoneOtp(e.target.value.replace(/\D/g, ''))}
+                placeholder="Enter 6-digit code"
+                aria-label="Mobile verification code"
+                className="flex-1 text-sm border border-slate-200 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+              <button
+                type="submit"
+                disabled={isVerifyingPhoneOtp || phoneOtp.length !== 6}
+                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl disabled:opacity-50"
+              >
+                {isVerifyingPhoneOtp ? 'Verifying...' : 'Verify Phone'}
+              </button>
+            </form>
+          )}
+        </div>
+      )}
 
     </div>
   );

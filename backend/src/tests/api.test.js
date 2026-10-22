@@ -6,6 +6,7 @@ import { env } from '../config/env.js';
 import { connectDB } from '../config/db.js';
 import { User, Ticket, TicketMessage, EmailEvent } from '../database/index.js';
 import { emailService } from '../services/email.service.js';
+import { smsService } from '../services/sms.service.js';
 
 const waitFor = async (findResult, timeoutMs = 3000) => {
   const deadline = Date.now() + timeoutMs;
@@ -44,6 +45,7 @@ describe('BitMax Production Ticketing System - Full Test Suite', () => {
 
     it('should register a new user without exposing the OTP in the response', async () => {
       const otpSpy = vi.spyOn(emailService, 'queueOTP');
+      const smsSpy = vi.spyOn(smsService, 'sendPhoneOTP');
       try {
         const res = await request(app).post('/api/auth/register').send({
           name: 'Automated Tester',
@@ -55,9 +57,11 @@ describe('BitMax Production Ticketing System - Full Test Suite', () => {
         expect(res.status).toBe(201);
         expect(res.body.success).toBe(true);
         expect(res.body.data.devOtp).toBeUndefined();
+        expect(smsSpy).not.toHaveBeenCalled();
         registrationOtp = otpSpy.mock.calls[0][2];
       } finally {
         otpSpy.mockRestore();
+        smsSpy.mockRestore();
       }
     });
 
@@ -74,6 +78,42 @@ describe('BitMax Production Ticketing System - Full Test Suite', () => {
       expect(res.body.data.user.isVerified).toBe(true);
       customerToken = res.body.data.tokens.accessToken;
       customerId = res.body.data.user.id;
+    });
+
+    it('should return a mobile login OTP without calling SMS or email providers', async () => {
+      const smsSpy = vi.spyOn(smsService, 'sendPhoneOTP');
+      const emailSpy = vi.spyOn(emailService, 'queueOTP');
+
+      try {
+        const res = await request(app)
+          .post('/api/auth/login-otp')
+          .send({ phone: '+91 9999988888' });
+
+        expect(res.status).toBe(200);
+        expect(res.body.data.testOtp).toMatch(/^\d{6}$/);
+        expect(smsSpy).not.toHaveBeenCalled();
+        expect(emailSpy).not.toHaveBeenCalled();
+      } finally {
+        smsSpy.mockRestore();
+        emailSpy.mockRestore();
+      }
+    });
+
+    it('should return a phone verification OTP without calling an SMS provider', async () => {
+      const smsSpy = vi.spyOn(smsService, 'sendPhoneOTP');
+
+      try {
+        const res = await request(app)
+          .post('/api/auth/phone/send-otp')
+          .set('Authorization', `Bearer ${customerToken}`)
+          .send({ phone: '+91 9999988888' });
+
+        expect(res.status).toBe(200);
+        expect(res.body.data.testOtp).toMatch(/^\d{6}$/);
+        expect(smsSpy).not.toHaveBeenCalled();
+      } finally {
+        smsSpy.mockRestore();
+      }
     });
 
     it('should login seeded agent with password', async () => {
