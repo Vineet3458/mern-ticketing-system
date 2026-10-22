@@ -112,11 +112,9 @@ class SmsService {
       }
     }
 
-    // Prominent, clean console logging for dev / review / real OTP delivery
+    // Keep the verification code and message body out of application logs.
     logger.info(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
     logger.info(`📱 [SMS SERVICE] DISPATCHED TO: ${displayPhone} (${e164Phone})`);
-    logger.info(`🔑 REAL OTP CODE: ${otp} (Expires in ${expiresMinutes} mins)`);
-    logger.info(`💬 SMS BODY: "${textBody}"`);
     if (providerDispatched) {
       logger.info(`📡 CARRIER STATUS: Live SMS transmitted via ${providerName}`);
     } else {

@@ -33,46 +33,9 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-const logDevOtp = (data, fallbackMsg = '') => {
-  const otp = data?.data?.devOtp || data?.devOtp;
-  if (otp) {
-    sessionStorage.setItem('lastDevOtp', String(otp));
-    console.log(
-      '%c╔══════════════════════════════════════════════════════════════════════╗\n' +
-      `║  🔑 [DEV / TESTING OTP CODE]: ${String(otp).padEnd(38)}║\n` +
-      '╚══════════════════════════════════════════════════════════════════════╝',
-      'color: #10b981; font-weight: bold; font-family: monospace; font-size: 14px; background: #0f172a; padding: 4px;'
-    );
-    console.log(
-      `%c👉 Verification OTP: %c${otp}%c (auto-logged for testing)`,
-      'font-size: 14px; font-weight: bold; color: #2563eb;',
-      'font-size: 16px; font-weight: 900; color: #10b981; background: #ecfdf5; padding: 2px 8px; border-radius: 4px; border: 1px solid #10b981;',
-      'font-size: 12px; color: #64748b;'
-    );
-  } else if (data?.message && (data.message.includes('OTP:') || data.message.includes('Dev OTP:'))) {
-    const match = data.message.match(/OTP:\s*([0-9]{6})/);
-    if (match) {
-      sessionStorage.setItem('lastDevOtp', match[1]);
-      console.log(
-        `%c🔑 [TESTING OTP]: %c${match[1]}`,
-        'font-size: 14px; font-weight: bold; color: #2563eb;',
-        'font-size: 16px; font-weight: 900; color: #10b981; background: #ecfdf5; padding: 2px 8px; border-radius: 4px;'
-      );
-    }
-  }
-};
-
 api.interceptors.response.use(
-  (response) => {
-    if (response?.data) {
-      logDevOtp(response.data);
-    }
-    return response;
-  },
+  (response) => response,
   async (error) => {
-    if (error.response?.data) {
-      logDevOtp(error.response.data);
-    }
     const originalRequest = error.config;
 
     // Check if error is 401 Unauthorized and not already retried

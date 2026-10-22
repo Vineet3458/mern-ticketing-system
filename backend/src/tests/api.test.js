@@ -1,10 +1,11 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import request from 'supertest';
 import mongoose from 'mongoose';
 import app from '../app.js';
 import { env } from '../config/env.js';
 import { connectDB } from '../config/db.js';
 import { User, Ticket, TicketMessage, EmailEvent } from '../database/index.js';
+import { emailService } from '../services/email.service.js';
 
 const waitFor = async (findResult, timeoutMs = 3000) => {
   const deadline = Date.now() + timeoutMs;
@@ -41,18 +42,23 @@ describe('BitMax Production Ticketing System - Full Test Suite', () => {
     const testEmail = `test.user.${Date.now()}@example.com`;
     let registrationOtp = '';
 
-    it('should register a new user and return OTP in dev mode', async () => {
-      const res = await request(app).post('/api/auth/register').send({
-        name: 'Automated Tester',
-        email: testEmail,
-        phone: '+91 9999988888',
-        password: 'Password123!',
-      });
+    it('should register a new user without exposing the OTP in the response', async () => {
+      const otpSpy = vi.spyOn(emailService, 'queueOTP');
+      try {
+        const res = await request(app).post('/api/auth/register').send({
+          name: 'Automated Tester',
+          email: testEmail,
+          phone: '+91 9999988888',
+          password: 'Password123!',
+        });
 
-      expect(res.status).toBe(201);
-      expect(res.body.success).toBe(true);
-      expect(res.body.data.devOtp).toBeDefined();
-      registrationOtp = res.body.data.devOtp;
+        expect(res.status).toBe(201);
+        expect(res.body.success).toBe(true);
+        expect(res.body.data.devOtp).toBeUndefined();
+        registrationOtp = otpSpy.mock.calls[0][2];
+      } finally {
+        otpSpy.mockRestore();
+      }
     });
 
     it('should verify OTP and issue JWT access and refresh tokens', async () => {

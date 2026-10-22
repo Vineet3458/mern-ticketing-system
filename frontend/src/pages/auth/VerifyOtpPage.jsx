@@ -25,8 +25,6 @@ export const VerifyOtpPage = () => {
   const [canResend, setCanResend] = useState(false);
   const [resendStatus, setResendStatus] = useState('');
 
-  const devOtp = location.state?.devOtp || sessionStorage.getItem('lastDevOtp') || '';
-
   useEffect(() => {
     let interval = null;
     if (timer > 0) {
@@ -36,17 +34,6 @@ export const VerifyOtpPage = () => {
     }
     return () => clearInterval(interval);
   }, [timer]);
-
-  useEffect(() => {
-    if (devOtp) {
-      console.log(
-        '%c╔══════════════════════════════════════════════════════════════════════╗\n' +
-        `║  🔑 [TESTING OTP READY]: ${String(devOtp).padEnd(42)}║\n` +
-        '╚══════════════════════════════════════════════════════════════════════╝',
-        'color: #10b981; font-weight: bold; font-family: monospace; font-size: 14px; background: #0f172a; padding: 4px;'
-      );
-    }
-  }, [devOtp]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -126,23 +113,6 @@ export const VerifyOtpPage = () => {
               placeholder="••••••"
               className="otp-input w-full text-center text-2xl font-bold py-3 border border-slate-300 rounded-2xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all tracking-[10px] font-mono"
             />
-            {devOtp && (
-              <div className="mt-2.5 p-2.5 bg-blue-50 border border-blue-200/80 rounded-xl flex items-center justify-between text-xs text-blue-900">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-semibold text-blue-700">Test OTP:</span>
-                  <code className="font-mono font-bold bg-white px-2 py-0.5 rounded border border-blue-200 text-blue-600 tracking-wider">
-                    {devOtp}
-                  </code>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setOtp(devOtp)}
-                  className="text-[11px] font-semibold text-blue-700 hover:text-blue-900 bg-blue-100 hover:bg-blue-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
-                >
-                  Auto-fill
-                </button>
-              </div>
-            )}
           </div>
 
           <button

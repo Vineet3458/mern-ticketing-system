@@ -23,7 +23,6 @@ export const errorHandler = (err, req, res, _next) => {
     success: false,
     message: statusCode >= 500 && env.isProd ? 'Internal server error' : message,
     errors,
-    ...(err.devOtp ? { devOtp: err.devOtp } : {}),
     ...(env.isProd ? {} : { stack: err.stack }),
   });
 };

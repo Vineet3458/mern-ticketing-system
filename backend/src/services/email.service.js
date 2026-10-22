@@ -52,12 +52,12 @@ const getTransporter = () => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Console fallback — prints email content visibly in dev when SMTP not set up
+// Console fallback used when SMTP is not configured.
 // ─────────────────────────────────────────────────────────────────────────────
-const logEmailToConsole = ({ to, subject, html, ticketNumber }) => {
-  const previewText = html
-    ? html.replace(/<[^>]+>/g, ' ').replace(/\s{2,}/g, ' ').trim().slice(0, 400)
-    : '(no body)';
+const logEmailToConsole = ({ to, subject, html, ticketNumber, sensitive = false }) => {
+  const previewText = sensitive
+    ? '(redacted)'
+    : (html ? html.replace(/<[^>]+>/g, ' ').replace(/\s{2,}/g, ' ').trim().slice(0, 400) : '(no body)');
 
   logger.warn('╔══════════════════════════════════════════════════════════');
   logger.warn('║  [DEV EMAIL — printed to console, SMTP not configured]');
@@ -77,20 +77,23 @@ export const sendRawEmail = async ({
   html,
   ticketNumber = null,
   ticketId = null,
+  sensitive = false,
 }) => {
   const transport = getTransporter();
   const toList = Array.isArray(to) ? to : [to];
 
   // ── No SMTP configured: log to console and persist as skipped_dev ──────────
   if (!transport) {
-    logEmailToConsole({ to, subject, html, ticketNumber });
+    logEmailToConsole({ to, subject, html, ticketNumber, sensitive });
 
     await EmailEvent.create({
       messageId: `dev_console_${Date.now()}`,
       ticketId,
       direction: EMAIL_DIRECTION.OUTBOUND,
       status: EMAIL_STATUS.SKIPPED_DEV,
-      error: 'Gmail SMTP not configured — see console for email content',
+      error: sensitive
+        ? 'Gmail SMTP not configured — email content was redacted from console'
+        : 'Gmail SMTP not configured — see console for email content',
       payload: { to, subject, ticketNumber },
       processedAt: new Date(),
     });
@@ -256,6 +259,7 @@ emailQueue.setHandler(async (job) => {
           name: payload.name,
           minutes: env.otp.expiresMinutes,
         }),
+        sensitive: true,
       });
       break;
 
