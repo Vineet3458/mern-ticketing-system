@@ -338,7 +338,7 @@ export const swaggerDocument = {
       post: {
         summary: 'Inbound email provider webhook endpoint',
         tags: ['Email'],
-        description: 'Processes incoming email replies, parses headers/thread, strips quotes, reopens tickets if resolved, appends messages.',
+        description: 'Processes incoming email replies from the requester or currently assigned agent, parses headers/thread, strips quotes, reopens tickets if resolved, stores messages, notifies the other participant, and broadcasts the conversation update over Socket.IO.',
         requestBody: {
           required: true,
           content: {

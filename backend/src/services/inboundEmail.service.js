@@ -10,6 +10,7 @@ import {
 } from '../constants/index.js';
 import { logger } from '../utils/logger.js';
 import { ioService } from './socket.service.js';
+import { emailService } from './email.service.js';
 
 // Strip common email quote replies (e.g., "On Sun, Jan 1 wrote:", "-----Original Message-----")
 export const stripQuotedEmail = (text = '') => {
@@ -138,18 +139,22 @@ export const processInboundEmail = async ({
   }
 
   // 4. Verify sender authorization
-  // Sender must either be the requester OR an existing user (customer/agent/admin)
-  let senderUser = await User.findOne({ email: normFrom });
+  const senderUser = await User.findOne({ email: normFrom });
+  const assignedUser = ticket.assignedTo
+    ? await User.findById(ticket.assignedTo).select('_id email')
+    : null;
   const isRequester = ticket.requesterEmail.toLowerCase() === normFrom;
+  const isAssignedUser =
+    senderUser && assignedUser && senderUser._id.toString() === assignedUser._id.toString();
 
-  if (!isRequester && !senderUser) {
+  if (!isRequester && !isAssignedUser) {
     logger.warn(`[InboundEmail] Unauthorized sender ${normFrom} tried replying to ${ticketNumber}`);
     await EmailEvent.create({
       ticketId: ticket._id,
       messageId: effectiveMessageId,
       direction: EMAIL_DIRECTION.INBOUND,
       status: EMAIL_STATUS.FAILED,
-      error: `Unauthorized sender: ${normFrom}`,
+      error: `Sender is not the requester or assigned agent: ${normFrom}`,
       payload: { from: normFrom, to, subject, ticketNumber },
     });
     return {
@@ -235,6 +240,25 @@ export const processInboundEmail = async ({
     },
     processedAt: new Date(),
   });
+
+  const actorName = senderName || senderUser?.name || normFrom;
+  if (wasClosedOrResolved) {
+    const statusRecipients = [ticket.requesterEmail, assignedUser?.email]
+      .filter(Boolean)
+      .map((email) => email.toLowerCase())
+      .filter((email, index, all) => all.indexOf(email) === index && email !== normFrom);
+    statusRecipients.forEach((email) => emailService.queueStatusChanged(ticket, actorName, email));
+    ioService.emitTicketStatusUpdated(ticket._id.toString(), {
+      ticketId: ticket._id.toString(),
+      ticketNumber: ticket.ticketNumber,
+      status: ticket.status,
+    });
+  }
+
+  const replyRecipient = isRequester ? assignedUser?.email : ticket.requesterEmail;
+  if (replyRecipient && replyRecipient.toLowerCase() !== normFrom) {
+    emailService.queueTicketReply(ticket, message, replyRecipient);
+  }
 
   // 11. Broadcast via Socket.IO
   ioService.emitTicketMessage(ticket._id.toString(), {

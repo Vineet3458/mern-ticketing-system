@@ -6,6 +6,18 @@ import { env } from '../config/env.js';
 import { connectDB } from '../config/db.js';
 import { User, Ticket, TicketMessage, EmailEvent } from '../database/index.js';
 
+const waitFor = async (findResult, timeoutMs = 3000) => {
+  const deadline = Date.now() + timeoutMs;
+  let result = await findResult();
+
+  while (!result && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    result = await findResult();
+  }
+
+  return result;
+};
+
 describe('BitMax Production Ticketing System - Full Test Suite', () => {
   let customerToken = '';
   let customerId = '';
@@ -100,6 +112,29 @@ describe('BitMax Production Ticketing System - Full Test Suite', () => {
       expect(res.body.data.status).toBe('open');
       createdTicketId = res.body.data._id;
       createdTicketNumber = res.body.data.ticketNumber;
+
+      const initialMessage = await TicketMessage.findOne({ ticketId: createdTicketId });
+      expect(initialMessage.body).toContain('Our card was charged');
+
+      const ticket = await Ticket.findById(createdTicketId).populate('assignedTo', 'email');
+      const confirmationEmail = await waitFor(() =>
+        EmailEvent.findOne({
+          ticketId: createdTicketId,
+          direction: 'outbound',
+          'payload.to': ticket.requesterEmail,
+        })
+      );
+      expect(confirmationEmail).toBeTruthy();
+
+      const assignmentEmail = await waitFor(() =>
+        EmailEvent.findOne({
+          ticketId: createdTicketId,
+          direction: 'outbound',
+          'payload.to': ticket.assignedTo.email,
+          'payload.subject': { $regex: /New ticket assigned to you/ },
+        })
+      );
+      expect(assignmentEmail).toBeTruthy();
     });
 
     it('customer can list their own tickets', async () => {
@@ -122,6 +157,30 @@ describe('BitMax Production Ticketing System - Full Test Suite', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.data.assignedTo).toBe(agentId);
+    });
+
+    it('emails public agent replies to the requester', async () => {
+      const ticket = await Ticket.findById(createdTicketId);
+      const res = await request(app)
+        .post(`/api/tickets/${createdTicketId}/messages`)
+        .set('Authorization', `Bearer ${agentToken}`)
+        .send({
+          body: 'We are investigating the payment issue.',
+          type: 'public',
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.data.source).toBe('web');
+
+      const replyEmail = await waitFor(() =>
+        EmailEvent.findOne({
+          ticketId: createdTicketId,
+          direction: 'outbound',
+          'payload.to': ticket.requesterEmail,
+          'payload.subject': { $regex: /New reply on your ticket/ },
+        })
+      );
+      expect(replyEmail).toBeTruthy();
     });
 
     it('agent can add an internal note', async () => {
@@ -172,10 +231,11 @@ describe('BitMax Production Ticketing System - Full Test Suite', () => {
     const inboundMessageId = `<inbound-test-${Date.now()}@mail.example.com>`;
 
     it('should process inbound email reply and reopen resolved ticket', async () => {
+      const ticket = await Ticket.findById(createdTicketId);
       const res = await request(app)
         .post('/api/email/inbound')
         .send({
-          from: 'john.doe@example.com',
+          from: ticket.requesterEmail,
           senderName: 'John Doe',
           to: `support+${createdTicketNumber}@bitmax.local`,
           subject: `Re: [${createdTicketNumber}] Payment failed for invoice #9921`,
@@ -190,6 +250,21 @@ describe('BitMax Production Ticketing System - Full Test Suite', () => {
       expect(res.status).toBe(200);
       expect(res.body.data.success).toBe(true);
       expect(res.body.data.reopened).toBe(true);
+
+      const storedMessage = await TicketMessage.findOne({ emailMessageId: inboundMessageId });
+      expect(storedMessage.body).toContain('Still having an issue');
+      expect(storedMessage.source).toBe('email');
+
+      const assignedAgent = await User.findById(ticket.assignedTo);
+      const agentNotification = await waitFor(() =>
+        EmailEvent.findOne({
+          ticketId: createdTicketId,
+          direction: 'outbound',
+          'payload.to': assignedAgent.email,
+          'payload.subject': { $regex: /New reply on your ticket/ },
+        })
+      );
+      expect(agentNotification).toBeTruthy();
 
       // Verify ticket is now reopened
       const ticketRes = await request(app)

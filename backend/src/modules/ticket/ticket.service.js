@@ -26,6 +26,30 @@ const sanitizeText = (txt = '') =>
     allowedAttributes: { span: ['style'] },
   });
 
+const getTicketNotificationRecipients = async (ticket, actorEmail) => {
+  const assignedUser = ticket.assignedTo
+    ? await User.findById(ticket.assignedTo).select('email')
+    : null;
+  const actor = actorEmail?.toLowerCase();
+  const emails = [ticket.requesterEmail, assignedUser?.email]
+    .filter(Boolean)
+    .map((email) => email.toLowerCase())
+    .filter((email, index, all) => all.indexOf(email) === index && email !== actor);
+
+  return emails;
+};
+
+const notifyTicketStatusChanged = async (ticket, actor) => {
+  const recipients = await getTicketNotificationRecipients(ticket, actor.email);
+  recipients.forEach((email) => emailService.queueStatusChanged(ticket, actor.name, email));
+};
+
+const notifyTicketEvent = async (ticket, actor, eventTitle, eventDetails) => {
+  const recipients = await getTicketNotificationRecipients(ticket, actor.email);
+  recipients.forEach((email) => emailService.queueTicketEvent(ticket, email, eventTitle, eventDetails));
+};
+
+
 export const ticketService = {
   // ─── Internal helper: pick the agent with the fewest active tickets ──────
   async _autoAssignAgent(ticket) {
@@ -84,6 +108,12 @@ export const ticketService = {
 
       // Notify the assigned agent by email
       emailService.queueTicketAssigned(ticket, agent);
+      emailService.queueTicketEvent(
+        ticket,
+        ticket.requesterEmail,
+        'Ticket assigned',
+        `Your ticket has been assigned to ${agent.name}.`
+      );
 
       logger.info(
         `[AutoAssign] ✅ Ticket ${ticket.ticketNumber} auto-assigned to ${agent.name} (${agent.email}) — workload: ${workloads[0].count} active tickets`
@@ -124,7 +154,7 @@ export const ticketService = {
     });
 
     // Record initial message as description thread start
-    await TicketMessage.create({
+    const initialMessage = await TicketMessage.create({
       ticketId: ticket._id,
       senderId: user._id,
       senderEmail: user.email,
@@ -158,6 +188,12 @@ export const ticketService = {
       ticketNumber: ticket.ticketNumber,
       status: ticket.status,
       action: 'created',
+    });
+    ioService.emitTicketMessage(ticket._id.toString(), {
+      ticketId: ticket._id.toString(),
+      ticketNumber: ticket.ticketNumber,
+      message: initialMessage,
+      status: ticket.status,
     });
 
     // Return fully-populated ticket so caller gets assignedTo populated
@@ -294,6 +330,7 @@ export const ticketService = {
     }
 
     const { category, priority, status } = updates;
+    const ticketEvents = [];
 
     if (category && category !== ticket.category) {
       const oldCat = ticket.category;
@@ -305,6 +342,10 @@ export const ticketService = {
         action: 'category_changed',
         oldValue: oldCat,
         newValue: ticket.category,
+      });
+      ticketEvents.push({
+        title: 'Ticket category updated',
+        details: `The category changed from ${oldCat} to ${ticket.category}.`,
       });
     }
 
@@ -319,8 +360,13 @@ export const ticketService = {
         oldValue: oldPri,
         newValue: ticket.priority,
       });
+      ticketEvents.push({
+        title: 'Ticket priority updated',
+        details: `The priority changed from ${oldPri} to ${ticket.priority}.`,
+      });
     }
 
+    let statusWasChanged = false;
     if (status && status !== ticket.status) {
       this.validateStatusTransition(ticket.status, status);
       const oldStat = ticket.status;
@@ -338,7 +384,7 @@ export const ticketService = {
         newValue: ticket.status,
       });
 
-      emailService.queueStatusChanged(ticket, user.name, ticket.requesterEmail);
+      statusWasChanged = true;
       ioService.emitTicketStatusUpdated(ticket._id.toString(), {
         ticketId: ticket._id.toString(),
         ticketNumber: ticket.ticketNumber,
@@ -347,6 +393,10 @@ export const ticketService = {
     }
 
     await ticket.save();
+    if (statusWasChanged) await notifyTicketStatusChanged(ticket, user);
+    for (const event of ticketEvents) {
+      await notifyTicketEvent(ticket, user, event.title, event.details);
+    }
     return ticket;
   },
 
@@ -377,8 +427,18 @@ export const ticketService = {
       newValue: agent.name,
     });
 
-    // Notify newly assigned agent
-    emailService.queueTicketAssigned(ticket, agent);
+    // Notify the newly assigned agent unless they performed the assignment.
+    if (agent.email.toLowerCase() !== user.email.toLowerCase()) {
+      emailService.queueTicketAssigned(ticket, agent);
+    }
+    if (ticket.requesterEmail.toLowerCase() !== user.email.toLowerCase()) {
+      emailService.queueTicketEvent(
+        ticket,
+        ticket.requesterEmail,
+        'Ticket assigned',
+        `Your ticket has been assigned to ${agent.name}.`
+      );
+    }
 
     ioService.emitTicketAssigned(ticket._id.toString(), {
       ticketId: ticket._id.toString(),
@@ -451,17 +511,19 @@ export const ticketService = {
       metadata: { messageId: message._id, type },
     });
 
-    // Notify appropriate party if it's a public message
+    // Notify the other participant when a public message is added.
     if (type === MESSAGE_TYPE.PUBLIC) {
       if (user.role === ROLES.CUSTOMER) {
-        // Customer replied -> notify assigned agent if any
         if (ticket.assignedTo) {
           const agent = await User.findById(ticket.assignedTo);
-          if (agent) emailService.queueTicketReply(ticket, message, agent.email, agent.name);
+          if (agent && agent.email.toLowerCase() !== user.email.toLowerCase()) {
+            emailService.queueTicketReply(ticket, message, agent.email);
+          }
         }
       } else {
-        // Support agent/admin replied -> notify customer
-        emailService.queueTicketReply(ticket, message, ticket.requesterEmail, ticket.requesterEmail);
+        if (ticket.requesterEmail.toLowerCase() !== user.email.toLowerCase()) {
+          emailService.queueTicketReply(ticket, message, ticket.requesterEmail);
+        }
       }
     }
 
@@ -501,7 +563,7 @@ export const ticketService = {
       metadata: { reason: reason || 'Marked resolved by agent' },
     });
 
-    emailService.queueStatusChanged(ticket, user.name, ticket.requesterEmail);
+    await notifyTicketStatusChanged(ticket, user);
 
     ioService.emitTicketStatusUpdated(ticket._id.toString(), {
       ticketId: ticket._id.toString(),
@@ -537,11 +599,7 @@ export const ticketService = {
       metadata: { reason: reason || 'Reopened by user' },
     });
 
-    // Notify agent if assigned
-    if (ticket.assignedTo) {
-      const agent = await User.findById(ticket.assignedTo);
-      if (agent) emailService.queueStatusChanged(ticket, user.name, agent.email);
-    }
+    await notifyTicketStatusChanged(ticket, user);
 
     ioService.emitTicketStatusUpdated(ticket._id.toString(), {
       ticketId: ticket._id.toString(),
@@ -577,7 +635,7 @@ export const ticketService = {
       metadata: { reason: reason || 'Ticket closed' },
     });
 
-    emailService.queueStatusChanged(ticket, user.name, ticket.requesterEmail);
+    await notifyTicketStatusChanged(ticket, user);
 
     ioService.emitTicketStatusUpdated(ticket._id.toString(), {
       ticketId: ticket._id.toString(),

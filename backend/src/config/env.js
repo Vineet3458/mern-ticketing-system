@@ -29,9 +29,13 @@ export const env = {
     gmailUser: process.env.GMAIL_USER || '',
     gmailAppPassword: process.env.GMAIL_APP_PASSWORD || '',
     from: process.env.EMAIL_FROM || `BitMax Support <${process.env.GMAIL_USER || 'noreply@bitmax.local'}>`,
+    inboundAddress: process.env.INBOUND_EMAIL_ADDRESS || process.env.GMAIL_USER || '',
+    imapEnabled: process.env.GMAIL_IMAP_ENABLED === 'true',
+    imapHost: process.env.GMAIL_IMAP_HOST || 'imap.gmail.com',
+    imapPort: Number(process.env.GMAIL_IMAP_PORT) || 993,
+    imapPollIntervalMs: Number(process.env.GMAIL_IMAP_POLL_INTERVAL_MS) || 60_000,
   },
   isProd: process.env.NODE_ENV === 'production',
   isDev: process.env.NODE_ENV !== 'production',
   isTest: process.env.NODE_ENV === 'test',
 };
-

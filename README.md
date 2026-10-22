@@ -19,10 +19,10 @@ A production-grade, enterprise-ready full-stack customer support and ticketing p
   - Strict status transition enforcement preventing invalid states
   - Priority-based SLA resolution countdown timers (Urgent: 4h, High: 12h, Medium: 24h, Low: 48h)
 - **Two-Way Bidirectional Email Synchronization**:
-  - **Outbound**: Instant background worker notifications for ticket creation, assignment, public replies, and status changes with branded HTML email templates.
-  - **Inbound**: Webhook processor (`POST /api/email/inbound`) that extracts ticket identifiers via `X-Ticket-Number`, `References`, `In-Reply-To`, or recipient tags (`support+TKT-XXXXXX@domain`).
+  - **Outbound**: Background email notifications for ticket creation, assignment, status/category/priority changes, and public replies. Notifications go to the requester and assigned agent as appropriate; internal notes are never emailed.
+  - **Inbound**: Gmail IMAP polling reads unread messages from the configured support inbox and matches replies to tickets using `X-Ticket-Number`, `References`, `In-Reply-To`, or the ticket number in the subject. The existing `POST /api/email/inbound` webhook remains available for external providers.
   - **Email Threading & Quote Stripping**: Removes quoted email reply history so only new responses are saved.
-  - **Auto Reopening**: When a customer replies by email to a `Resolved` or `Closed` ticket, the ticket is automatically reopened and logged.
+  - **Conversation Synchronization**: Email replies are stored as ticket messages in MongoDB and broadcast to the ticket conversation over Socket.IO. When a customer replies by email to a `Resolved` or `Closed` ticket, the ticket is automatically reopened and logged.
   - **Idempotency & Deduplication**: Rejects duplicate Message-IDs with zero errors.
 - **Real-Time Collaboration**: Socket.IO integration broadcasting live messages, status updates, and assignments to connected browser sessions without page reload.
 - **Role-Based Isolation (RBAC)**:
@@ -40,9 +40,9 @@ A production-grade, enterprise-ready full-stack customer support and ticketing p
 | **Frontend** | React 18, Vite 5, Tailwind CSS, Redux Toolkit, React Router v6, Lucide Icons |
 | **Backend** | Node.js (ES Modules), Express.js 4, Socket.IO 4, Multer, Sanitize-HTML |
 | **Database** | MongoDB with Mongoose 8 ODM |
-| **Email & Queue** | Resend API, Resilient Async Background Queue |
+| **Email & Queue** | Gmail SMTP (Nodemailer), Gmail IMAP (ImapFlow), In-memory Async Background Queue |
 | **API & Docs** | Swagger / OpenAPI 3.0 (`/api/docs`), Postman Collection v2.1 |
-| **Testing** | Vitest, Supertest (17/17 comprehensive integration tests passing) |
+| **Testing** | Vitest, Supertest (19/19 backend tests passing) |
 | **DevOps** | Docker, Docker Compose |
 
 ---
@@ -126,6 +126,8 @@ npm run seed
 npm run dev
 ```
 Backend will start on `http://localhost:5000` with Swagger documentation available at `http://localhost:5000/api/docs`.
+
+For Gmail development email, enable IMAP in Gmail settings and configure `GMAIL_USER`, `GMAIL_APP_PASSWORD`, and `EMAIL_FROM` in `backend/.env`. Create a Gmail App Password after enabling 2-Step Verification; use that password for both Nodemailer SMTP and IMAP. Set `GMAIL_IMAP_ENABLED=true` to poll the account's `INBOX` every 60 seconds (customize with `GMAIL_IMAP_POLL_INTERVAL_MS`). Ticket emails use the configured inbox as their Reply-To by default. Replies matching a ticket are stored in MongoDB and appear in the website conversation. Use the existing `POST /api/email/inbound` webhook instead if receiving mail through an external email provider. Only the ticket requester and currently assigned agent can reply by email.
 
 ### 3. Frontend Setup
 In a new terminal window:

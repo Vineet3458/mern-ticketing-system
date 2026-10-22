@@ -4,6 +4,7 @@ import { connectDB } from './config/db.js';
 import app from './app.js';
 import { logger } from './utils/logger.js';
 import { initSocket } from './services/socket.service.js';
+import { startInboundImap } from './services/inboundImap.service.js';
 
 const start = async () => {
   await connectDB();
@@ -13,6 +14,7 @@ const start = async () => {
   httpServer.listen(env.port, () => {
     logger.info(`Server running on port ${env.port} (${env.nodeEnv})`);
     logger.info(`API Documentation: http://localhost:${env.port}/api/docs`);
+    startInboundImap();
   });
 };
 
@@ -20,4 +22,3 @@ start().catch((err) => {
   logger.error('Failed to start server', err);
   process.exit(1);
 });
-

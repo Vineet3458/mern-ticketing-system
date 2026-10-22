@@ -9,6 +9,7 @@ import {
   ticketAssignedTemplate,
   ticketReplyTemplate,
   ticketStatusChangedTemplate,
+  ticketEventTemplate,
   otpTemplate,
 } from '../templates/email/index.js';
 
@@ -109,6 +110,7 @@ export const sendRawEmail = async ({
       to: toList.join(', '),
       subject: finalSubject,
       html,
+      ...(ticketNumber && env.email.inboundAddress ? { replyTo: env.email.inboundAddress } : {}),
       // Email threading headers (for ticket conversations)
       headers: ticketNumber
         ? {
@@ -228,6 +230,22 @@ emailQueue.setHandler(async (job) => {
       });
       break;
 
+    case 'TICKET_EVENT':
+      await sendRawEmail({
+        to: payload.to,
+        subject: payload.eventTitle,
+        html: ticketEventTemplate({
+          ticketNumber: payload.ticketNumber,
+          subject: payload.subject,
+          eventTitle: payload.eventTitle,
+          eventDetails: payload.eventDetails,
+          clientUrl: env.clientUrl,
+        }),
+        ticketNumber: payload.ticketNumber,
+        ticketId: payload.ticketId,
+      });
+      break;
+
     // ── OTP verification email ────────────────────────────────────────────────
     case 'OTP':
       await sendRawEmail({
@@ -317,6 +335,21 @@ export const emailService = {
         subject: ticket.subject,
         status: ticket.status,
         actorName: actorName || 'System',
+      },
+    });
+  },
+
+  queueTicketEvent: (ticket, recipientEmail, eventTitle, eventDetails) => {
+    if (!recipientEmail) return;
+    emailQueue.add('send_ticket_event', {
+      type: 'TICKET_EVENT',
+      payload: {
+        to: recipientEmail,
+        ticketNumber: ticket.ticketNumber,
+        ticketId: ticket._id,
+        subject: ticket.subject,
+        eventTitle,
+        eventDetails,
       },
     });
   },

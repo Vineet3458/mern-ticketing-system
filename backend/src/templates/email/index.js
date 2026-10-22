@@ -78,6 +78,17 @@ export const ticketAssignedTemplate = ({ ticketNumber, subject, assignedAgentNam
   return baseTemplate(`Assigned: ${ticketNumber}`, content);
 };
 
+export const ticketEventTemplate = ({ ticketNumber, subject, eventTitle, eventDetails, clientUrl }) => {
+  const content = `
+    <span class="ticket-badge">Ticket Update: ${ticketNumber}</span>
+    <h2 style="margin: 0 0 12px; color: #0f172a; font-size: 18px;">${eventTitle}</h2>
+    <p style="color: #475569; line-height: 1.6; margin: 0 0 16px;">${eventDetails}</p>
+    <p style="color: #475569; line-height: 1.6;">Ticket: <strong>${subject}</strong></p>
+    <a href="${clientUrl}/tickets/${ticketNumber}" class="button" target="_blank">View Ticket Details</a>
+  `;
+  return baseTemplate(`${eventTitle} - ${ticketNumber}`, content);
+};
+
 export const ticketReplyTemplate = ({ ticketNumber, subject, senderName, replyBody, clientUrl }) => {
   const content = `
     <span class="ticket-badge">New Reply: ${ticketNumber}</span>
