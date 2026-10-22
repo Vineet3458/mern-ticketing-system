@@ -1,9 +1,6 @@
 import React, { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import {
-  User, Mail, Phone, Save, CheckCircle2, AlertCircle,
-  ShieldCheck, Lock, Smartphone, ArrowRight, RefreshCw
-} from 'lucide-react';
+import { User, Mail, Phone, Save, CheckCircle2, AlertCircle } from 'lucide-react';
 import { RoleBadge } from '../../components/common/RoleBadge.jsx';
 import { PhoneInput } from '../../components/common/PhoneInput.jsx';
 import api from '../../services/api.js';
@@ -55,13 +52,6 @@ export const UserProfilePage = () => {
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Phone OTP verification flow
-  const [phoneOtpStep, setPhoneOtpStep] = useState('idle'); // idle | sent | verified
-  const [phoneOtpCode, setPhoneOtpCode] = useState('');
-  const [phoneOtpLoading, setPhoneOtpLoading] = useState(false);
-  const [phoneOtpError, setPhoneOtpError] = useState('');
-  const [phoneOtpTimer, setPhoneOtpTimer] = useState(0);
-
   const showSuccess = (msg) => { setSuccessMsg(msg); setErrorMsg(''); };
   const showError = (msg) => { setErrorMsg(msg); setSuccessMsg(''); };
 
@@ -81,46 +71,6 @@ export const UserProfilePage = () => {
     }
   };
 
-  const handleSendPhoneOtp = async () => {
-    if (!user?.phone) return;
-    setPhoneOtpLoading(true);
-    setPhoneOtpError('');
-    try {
-      const res = await api.post('/auth/phone/send-otp', { phone: user.phone });
-      setPhoneOtpStep('sent');
-      setPhoneOtpTimer(60);
-
-      // Countdown
-      const interval = setInterval(() => {
-        setPhoneOtpTimer(t => {
-          if (t <= 1) { clearInterval(interval); return 0; }
-          return t - 1;
-        });
-      }, 1000);
-    } catch (err) {
-      setPhoneOtpError(err.response?.data?.message || 'Failed to send OTP.');
-    } finally {
-      setPhoneOtpLoading(false);
-    }
-  };
-
-  const handleVerifyPhoneOtp = async (e) => {
-    e.preventDefault();
-    setPhoneOtpLoading(true);
-    setPhoneOtpError('');
-    try {
-      await api.post('/auth/phone/verify-otp', { phone: user.phone, otp: phoneOtpCode });
-      await dispatch(fetchUserProfile());
-      setPhoneOtpStep('verified');
-      setPhoneOtpCode('');
-      showSuccess('📱 Phone number verified successfully!');
-    } catch (err) {
-      setPhoneOtpError(err.response?.data?.message || 'Invalid OTP code.');
-    } finally {
-      setPhoneOtpLoading(false);
-    }
-  };
-
   const joinedDate = user?.createdAt
     ? new Date(user.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })
     : 'N/A';
@@ -129,7 +79,7 @@ export const UserProfilePage = () => {
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-black text-slate-900 tracking-tight">Account Profile</h1>
-        <p className="text-xs text-slate-500 mt-0.5">Manage your personal settings and verifications.</p>
+        <p className="text-xs text-slate-500 mt-0.5">Manage your personal settings.</p>
       </div>
 
       {/* Avatar Card */}
@@ -151,7 +101,7 @@ export const UserProfilePage = () => {
         {/* Quick Status */}
         <div className="grid grid-cols-2 gap-2 mt-5 pt-5 border-t border-slate-100">
           <InfoCard icon={Mail} label="Email" value={user?.email} verified={user?.isVerified} />
-          <InfoCard icon={Phone} label="Phone" value={formatDisplayPhone(user?.phone)} verified={user?.isPhoneVerified} verifiedLabel="Phone ✓" />
+          <InfoCard icon={Phone} label="Phone" value={formatDisplayPhone(user?.phone)} />
         </div>
       </div>
 
@@ -228,100 +178,6 @@ export const UserProfilePage = () => {
         </form>
       </div>
 
-      {/* Phone Verification Card */}
-      {!user?.isPhoneVerified && (
-        <div className="bg-white rounded-3xl border border-slate-200/80 card-shadow p-8">
-          <h3 className="text-sm font-extrabold text-slate-900 mb-1 flex items-center gap-2">
-            <Smartphone className="w-4 h-4 text-emerald-600" />
-            Verify Mobile Number
-          </h3>
-          <p className="text-xs text-slate-500 mb-5">
-            Receive an OTP on{' '}
-            <strong className="font-mono tracking-wide">{formatDisplayPhone(user?.phone)}</strong>{' '}
-            to verify your phone number.
-          </p>
-
-          {phoneOtpError && (
-            <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-700 p-3 rounded-xl text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 flex-shrink-0" />
-              <span>{phoneOtpError}</span>
-            </div>
-          )}
-
-          {phoneOtpStep === 'idle' && (
-            <button
-              type="button"
-              onClick={handleSendPhoneOtp}
-              disabled={phoneOtpLoading || !user?.phone}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-500/20 transition-all hover:scale-105 active:scale-100 disabled:opacity-50 disabled:scale-100"
-            >
-              <Smartphone className="w-3.5 h-3.5" />
-              {phoneOtpLoading ? 'Sending OTP...' : 'Send OTP to Phone'}
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          )}
-
-          {phoneOtpStep === 'sent' && (
-            <form onSubmit={handleVerifyPhoneOtp} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-2 text-center">
-                  Enter 6-digit code sent to{' '}
-                  <span className="font-mono">{formatDisplayPhone(user?.phone)}</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  maxLength={6}
-                  autoFocus
-                  value={phoneOtpCode}
-                  onChange={(e) => setPhoneOtpCode(e.target.value.replace(/\D/g, ''))}
-                  placeholder="123456"
-                  className="w-full text-center text-2xl font-black tracking-[10px] border-2 border-slate-200 rounded-xl py-3 outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-mono"
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-slate-500">
-                  {phoneOtpTimer > 0
-                    ? `Resend in ${phoneOtpTimer}s`
-                    : (
-                      <button type="button" onClick={handleSendPhoneOtp} disabled={phoneOtpLoading} className="text-emerald-600 font-bold underline flex items-center gap-1">
-                        <RefreshCw className="w-3 h-3" />
-                        Resend Code
-                      </button>
-                    )
-                  }
-                </span>
-                <button
-                  type="submit"
-                  disabled={phoneOtpLoading || phoneOtpCode.length < 6}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition-all disabled:opacity-50"
-                >
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  {phoneOtpLoading ? 'Verifying...' : 'Verify Code'}
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-      )}
-
-      {/* Phone Already Verified Card */}
-      {user?.isPhoneVerified && (
-        <div className="bg-emerald-50 rounded-3xl border border-emerald-200 p-6 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 flex-shrink-0">
-            <ShieldCheck className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <p className="text-sm font-bold text-emerald-800">Mobile Number Verified</p>
-            <p className="text-xs text-emerald-700 mt-0.5">
-              <span className="font-mono tracking-wide">{formatDisplayPhone(user?.phone)}</span>{' '}was verified on{' '}
-              {user?.phoneVerifiedAt
-                ? new Date(user.phoneVerifiedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })
-                : 'N/A'}.
-            </p>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
