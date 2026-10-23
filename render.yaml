@@ -15,7 +15,7 @@ services:
       - key: SERVE_FRONTEND
         value: "false"
       - key: CLIENT_URL
-        value: https://mern-ticketing-system-1.onrender.com
+        value: https://mern-ticketing-system-jq9i6r1bd-vineet-yadavs-projects-748fa972.vercel.app
       - key: MONGO_URI
         sync: false
       - key: JWT_ACCESS_SECRET
@@ -24,10 +24,6 @@ services:
         generateValue: true
       - key: GMAIL_IMAP_ENABLED
         value: "false"
-      - key: GOOGLE_APPS_SCRIPT_URL
-        sync: false
-      - key: EMAIL_API_SECRET
-        sync: false
   - type: static
     name: mern-ticketing-frontend
     rootDir: frontend

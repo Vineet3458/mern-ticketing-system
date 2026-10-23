@@ -60,27 +60,12 @@ export const getEmailDomain = (email) => {
 };
 
 /**
- * Validate an email against syntax, length, disposable blacklist,
- * and optional allowed/blocked domain lists.
+ * Validate an email's syntax, length, and disposable-domain status.
  *
  * @param {string} email - Email candidate to validate
- * @param {object} [options]
- * @param {boolean} [options.disallowDisposable=true] - Disallow known throwaway domains
- * @param {string[]} [options.allowedDomains] - Strict whitelist of domains (if provided)
- * @param {string[]} [options.blockedDomains] - Custom blacklist of domains
  * @returns {{ valid: boolean, reason?: string, domain?: string }}
  */
-export const checkEmailRestrictions = (email, options = {}) => {
-  const {
-    disallowDisposable = true,
-    allowedDomains = process.env.ALLOWED_EMAIL_DOMAINS
-      ? process.env.ALLOWED_EMAIL_DOMAINS.split(',').map((d) => d.trim().toLowerCase()).filter(Boolean)
-      : null,
-    blockedDomains = process.env.BLOCKED_EMAIL_DOMAINS
-      ? process.env.BLOCKED_EMAIL_DOMAINS.split(',').map((d) => d.trim().toLowerCase()).filter(Boolean)
-      : [],
-  } = options;
-
+export const checkEmailRestrictions = (email) => {
   if (!email || typeof email !== 'string') {
     return { valid: false, reason: 'Email address is required.' };
   }
@@ -115,34 +100,12 @@ export const checkEmailRestrictions = (email, options = {}) => {
   }
 
   // Check disposable email blacklist
-  if (disallowDisposable && DISPOSABLE_DOMAINS.has(domain)) {
+  if (DISPOSABLE_DOMAINS.has(domain)) {
     return {
       valid: false,
       domain,
       reason: `Email domain "${domain}" is a temporary/disposable service and is not allowed. Please use a permanent email address.`,
     };
-  }
-
-  // Check custom blocked domains
-  if (blockedDomains && blockedDomains.length > 0) {
-    if (blockedDomains.includes(domain)) {
-      return {
-        valid: false,
-        domain,
-        reason: `Email domain "${domain}" is restricted and blocked on this platform.`,
-      };
-    }
-  }
-
-  // Check strict whitelist if configured
-  if (allowedDomains && allowedDomains.length > 0) {
-    if (!allowedDomains.includes(domain)) {
-      return {
-        valid: false,
-        domain,
-        reason: `Only email addresses from approved domains (${allowedDomains.join(', ')}) are allowed.`,
-      };
-    }
   }
 
   return { valid: true, domain };
@@ -153,8 +116,8 @@ export const checkEmailRestrictions = (email, options = {}) => {
  * @param {string} email
  * @param {object} [options]
  */
-export const assertEmailNotRestricted = (email, options = {}) => {
-  const check = checkEmailRestrictions(email, options);
+export const assertEmailNotRestricted = (email) => {
+  const check = checkEmailRestrictions(email);
   if (!check.valid) {
     throw ApiError.badRequest(check.reason);
   }

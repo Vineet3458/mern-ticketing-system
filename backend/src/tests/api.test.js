@@ -24,8 +24,6 @@ describe('BitMax Production Ticketing System - Full Test Suite', () => {
   const emailProviderConfig = {
     gmailUser: env.email.gmailUser,
     gmailAppPassword: env.email.gmailAppPassword,
-    appsScriptUrl: env.email.appsScriptUrl,
-    appsScriptSecret: env.email.appsScriptSecret,
   };
   let customerToken = '';
   let customerId = '';
@@ -38,8 +36,6 @@ describe('BitMax Production Ticketing System - Full Test Suite', () => {
   beforeAll(async () => {
     env.email.gmailUser = '';
     env.email.gmailAppPassword = '';
-    env.email.appsScriptUrl = '';
-    env.email.appsScriptSecret = '';
 
     if (mongoose.connection.readyState === 0) {
       await connectDB();

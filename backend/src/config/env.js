@@ -42,10 +42,7 @@ export const env = {
     // 3. Set GMAIL_USER=your@gmail.com and GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
     gmailUser: process.env.GMAIL_USER || '',
     gmailAppPassword: process.env.GMAIL_APP_PASSWORD || '',
-    appsScriptUrl: process.env.GOOGLE_APPS_SCRIPT_URL || '',
-    appsScriptSecret: process.env.EMAIL_API_SECRET || '',
     from: process.env.EMAIL_FROM || `BitMax Support <${process.env.GMAIL_USER || 'noreply@bitmax.local'}>`,
-    inboundAddress: process.env.INBOUND_EMAIL_ADDRESS || process.env.GMAIL_USER || '',
     imapEnabled: process.env.GMAIL_IMAP_ENABLED === 'true',
     imapHost: process.env.GMAIL_IMAP_HOST || 'imap.gmail.com',
     imapPort: Number(process.env.GMAIL_IMAP_PORT) || 993,

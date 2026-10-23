@@ -127,22 +127,11 @@ npm run dev
 ```
 Backend will start on `http://localhost:5000` with Swagger documentation available at `http://localhost:5000/api/docs`.
 
-For Gmail development email, enable IMAP in Gmail settings and configure `GMAIL_USER`, `GMAIL_APP_PASSWORD`, and `EMAIL_FROM` in `backend/.env`. Create a Gmail App Password after enabling 2-Step Verification; use that password for both Nodemailer SMTP and IMAP. Set `GMAIL_IMAP_ENABLED=true` to poll the account's `INBOX` every 60 seconds (customize with `GMAIL_IMAP_POLL_INTERVAL_MS`). Ticket emails use the configured inbox as their Reply-To by default. Replies matching a ticket are stored in MongoDB and appear in the website conversation. Use the existing `POST /api/email/inbound` webhook instead if receiving mail through an external email provider. Only the ticket requester and currently assigned agent can reply by email.
+For Gmail email, configure `GMAIL_USER`, `GMAIL_APP_PASSWORD`, and `EMAIL_FROM` in `backend/.env`. Create a Gmail App Password after enabling 2-Step Verification; use that password for Nodemailer SMTP and, optionally, IMAP. Set `GMAIL_IMAP_ENABLED=true` to poll the Gmail user's `INBOX` every 60 seconds (customize with `GMAIL_IMAP_POLL_INTERVAL_MS`). Ticket emails use `GMAIL_USER` as their Reply-To address. Replies matching a ticket are stored in MongoDB and appear in the website conversation. Only the ticket requester and currently assigned agent can reply by email.
 
-### Google Apps Script outbound email (no SMTP ports)
+Phone OTP remains available through the application's existing local/test flow; it is not sent through Twilio or Fast2SMS. Email addresses are validated for format and known disposable domains; custom allowlists and blocklists are not used.
 
-If the deployment host blocks SMTP ports, use the Apps Script web app provider:
-
-1. Create a Google Apps Script project and copy `apps-script/Code.gs` into its editor.
-2. In **Project Settings → Script properties**, add `EMAIL_API_SECRET` with a long random secret.
-3. Deploy as a **Web app**, executing as your Google account and allowing access to anyone. The shared secret in the request is what authorizes the backend.
-4. Copy the deployed `/exec` URL into the backend's `GOOGLE_APPS_SCRIPT_URL` setting. Set the same `EMAIL_API_SECRET` in the backend host's environment and in Apps Script Script Properties. On Render, add both variables to the backend Web Service (or enter them when applying the Blueprint), then redeploy the backend.
-5. If you edit the Apps Script after deploying it, create a new deployment version or update the existing deployment to that version. Open the `/exec` URL in a browser; it should return `{"success":true,...}`.
-6. Send a test email and check the backend logs and the Apps Script **Executions** page. The backend sends `secret`, `to`, `subject`, and `html` in its POST body, so the script must validate those fields and return JSON with `success: true` on success.
-
-If the app reports an email failure, verify the script's execution log, that its deployment allows access to anyone and executes as your Google account, and that the backend URL ends in `/exec` (not `/dev`). Apps Script may also reject mail when the deploying Google account has exhausted its daily sending quota.
-
-The Apps Script executes under the Google account that deployed it and uses that account's Mail quota/sending identity. Keep the secret private and rotate it in both Apps Script Script Properties and the backend environment if exposed. Do not use an Apps Script `/dev` test URL in production. If an SMTP server accepts a message but its success response is lost, the fallback can cause a duplicate email; SMTP success is recorded immediately to avoid retrying successful sends.
+Outbound email uses Gmail SMTP configured on the backend. Set `GMAIL_USER`, `GMAIL_APP_PASSWORD`, and `EMAIL_FROM` on the backend host; never put these credentials in the Vercel frontend project. When SMTP is unavailable or not configured, email delivery is skipped or recorded as failed by the backend; there is no external email fallback.
 
 ## Deploying the frontend to Vercel
 
@@ -152,7 +141,7 @@ The frontend is a Vite single-page application. Its API and Socket.IO clients sh
 VITE_API_URL=https://mern-ticketing-system-qqpf.onrender.com
 ```
 
-Only this public backend URL belongs in Vercel. Do not add MongoDB, JWT, email, SMTP, or Apps Script secrets to the frontend project. Backend email and database configuration remain on Render.
+Only this public backend URL belongs in Vercel. Do not add MongoDB, JWT, email, or SMTP secrets to the frontend project. Backend email and database configuration remain on Render.
 
 1. Import this repository into Vercel.
 2. Set **Root Directory** to `frontend`. Vercel should detect Vite; use install command `npm ci`, build command `npm run build`, and output directory `dist`.
@@ -181,7 +170,7 @@ The repository includes a Render Blueprint in `render.yaml` for separate service
 1. Push the latest code to GitHub and create/update the Render **Blueprint** from the repository root. The Blueprint sets the backend and frontend root directories separately.
 2. Set the prompted `MONGO_URI` to a production MongoDB Atlas connection string. The Blueprint generates separate access-token and refresh-token secrets.
 3. Set the backend `CLIENT_URL` to the frontend's exact origin. For the Render Static Site this is `https://mern-ticketing-system-1.onrender.com`; if serving the frontend from Vercel instead, follow the Vercel section above and include the Vercel origin. Set the frontend `VITE_API_URL` to `https://mern-ticketing-system-qqpf.onrender.com`, without `/api`.
-4. Optionally configure `GOOGLE_APPS_SCRIPT_URL` and `EMAIL_API_SECRET` for outbound email fallback, or Gmail SMTP credentials. `GMAIL_IMAP_ENABLED` defaults to `false`; continuous IMAP polling should only be enabled on an always-on service.
+4. Optionally configure Gmail SMTP credentials for outbound email. `GMAIL_IMAP_ENABLED` defaults to `false`; continuous IMAP polling should only be enabled on an always-on service.
 5. Deploy both services. Check the backend `/api/health` URL, then open the frontend URL.
 
 The backend service sets `SERVE_FRONTEND=false`, so it does not require `frontend/dist`. The Static Site must rewrite client-side routes to `index.html`. The Blueprint defines this rule; if the existing Static Site was created manually or is not synced to the Blueprint, add a **Rewrite** rule in its Render Dashboard under **Redirects/Rewrites** with source `/*` and destination `/index.html`. Without this fallback, navigating directly to or refreshing a route such as `/verify-otp` returns a host-level 404. The free Render web service may spin down after inactivity; use an always-on plan for continuously available Socket.IO or IMAP polling. The email queue remains in-memory and best-effort, so a process restart can discard queued email.
