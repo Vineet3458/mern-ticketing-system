@@ -50,6 +50,8 @@ The backend connects to Gmail SMTP on TCP port 587 and Gmail IMAP on TCP port 99
 
 Free Render services can spin down after inactivity. An IMAP poller running in a free web service cannot provide reliable continuous inbox monitoring while the service is spun down. Use an always-on backend plan for dependable inbound polling and continuous Socket.IO availability.
 
+The IMAP poller reads unread mail in the configured Gmail `INBOX`. The existing processing flow marks messages seen after processing, including unrelated messages it ignores because they have no ticket identifier. Use a dedicated support inbox rather than a personal inbox if unrelated unread mail should not be consumed.
+
 ## Deploy and verify
 
 1. Deploy the backend changes to Render.
@@ -63,6 +65,7 @@ Free Render services can spin down after inactivity. An IMAP poller running in a
 
 - **Confirmed from Render logs:** the previous SMTP attempt failed with `Connection timeout`.
 - **Confirmed from Render logs:** IMAP polling was disabled.
+- **Confirmed after the change:** `GMAIL_IMAP_ENABLED=true` was added to the live Render service, the `a8c6e92` backend deployment completed, and the IMAP poller processed unread messages. The processed messages shown in logs were ignored because they did not contain ticket identifiers.
 - **Local automated tests:** the existing focused email and IMAP parsing tests pass.
-- **Not yet verified:** a successful SMTP delivery or a live IMAP connection/message import after the production configuration is updated.
-- **Manual action required:** sync/deploy this change, ensure the live Render variable `GMAIL_IMAP_ENABLED=true` exists, and verify the Gmail account prerequisites above.
+- **Not yet verified:** a successful SMTP delivery or a real ticket reply imported into its matching conversation. Trigger a fresh email action and reply to a ticket email to verify those end-to-end paths.
+- **Manual action required:** verify the Gmail account prerequisites above and confirm the SMTP port 587 connection works from Render by triggering an application email.
