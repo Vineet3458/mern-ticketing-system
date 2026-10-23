@@ -8,6 +8,18 @@ for (const key of required) {
 
 const isHosted = Boolean(process.env.RENDER_EXTERNAL_URL || process.env.VERCEL);
 const nodeEnv = process.env.NODE_ENV || (isHosted ? 'production' : 'development');
+const emailProvider = process.env.EMAIL_PROVIDER || 'smtp';
+if (!['smtp', 'apps_script'].includes(emailProvider)) {
+  throw new Error('EMAIL_PROVIDER must be either "smtp" or "apps_script"');
+}
+if (emailProvider === 'apps_script') {
+  if (!process.env.APPS_SCRIPT_URL || !process.env.APPS_SCRIPT_SECRET) {
+    throw new Error('APPS_SCRIPT_URL and APPS_SCRIPT_SECRET are required when EMAIL_PROVIDER=apps_script');
+  }
+  if (!/^https:\/\/[^/]+/i.test(process.env.APPS_SCRIPT_URL)) {
+    throw new Error('APPS_SCRIPT_URL must be an HTTPS URL');
+  }
+}
 
 const clientUrls = (
   process.env.CLIENT_URL ||
@@ -36,10 +48,9 @@ export const env = {
     maxAttempts: Number(process.env.OTP_MAX_ATTEMPTS) || 5,
   },
   email: {
-    // Gmail SMTP via Nodemailer
-    // 1. Enable 2-Step Verification on your Google account
-    // 2. Go to https://myaccount.google.com/apppasswords → create App Password
-    // 3. Set GMAIL_USER=your@gmail.com and GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
+    provider: emailProvider,
+    appsScriptUrl: process.env.APPS_SCRIPT_URL || '',
+    appsScriptSecret: process.env.APPS_SCRIPT_SECRET || '',
     gmailUser: process.env.GMAIL_USER || '',
     gmailAppPassword: process.env.GMAIL_APP_PASSWORD || '',
     from: process.env.EMAIL_FROM || `BitMax Support <${process.env.GMAIL_USER || 'noreply@bitmax.local'}>`,

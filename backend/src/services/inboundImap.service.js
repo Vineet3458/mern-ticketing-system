@@ -119,6 +119,11 @@ const runPoll = async () => {
 };
 
 export const startInboundImap = () => {
+  if (env.email.provider === 'apps_script') {
+    logger.info('[InboundIMAP] Polling disabled because Apps Script handles Gmail inbox polling');
+    return;
+  }
+
   if (!env.email.imapEnabled) {
     logger.info('[InboundIMAP] Polling disabled; set GMAIL_IMAP_ENABLED=true to receive replies from Gmail');
     return;

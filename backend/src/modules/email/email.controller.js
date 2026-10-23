@@ -5,7 +5,7 @@ import { processInboundEmail } from '../../services/inboundEmail.service.js';
 export const handleInboundWebhook = asyncHandler(async (req, res) => {
   // Support standard webhook formats (SendGrid inbound, Mailgun, or direct BitMax format)
   const body = req.body || {};
-  const from = body.from || body.sender || body.envelope?.from || body.From || '';
+  const from = body.emailFrom || body.from || body.sender || body.envelope?.from || body.From || '';
   const to = body.to || body.recipient || body.envelope?.to || body.To || '';
   const subject = body.subject || body.Subject || '';
   const messageBody = body.body || body.text || body.strippedText || body['body-plain'] || '';

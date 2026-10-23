@@ -18,6 +18,41 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 let transporter = null;
 
+const sendViaAppsScript = async (email) => {
+  if (!env.email.appsScriptUrl || !env.email.appsScriptSecret) {
+    throw new Error('Apps Script email provider requires APPS_SCRIPT_URL and APPS_SCRIPT_SECRET');
+  }
+
+  const response = await fetch(env.email.appsScriptUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: 'sendEmail',
+      secret: env.email.appsScriptSecret,
+      email: {
+        to: email.to,
+        subject: email.subject,
+        html: email.html,
+        replyTo: email.replyTo,
+      },
+    }),
+    signal: AbortSignal.timeout(20_000),
+  });
+
+  let result;
+  try {
+    result = await response.json();
+  } catch {
+    throw new Error('Apps Script returned a non-JSON response; check the web app deployment access and URL');
+  }
+
+  if (!response.ok || result.success !== true) {
+    throw new Error(result.error || `Apps Script email request failed with HTTP ${response.status}`);
+  }
+
+  return { messageId: result.messageId };
+};
+
 const getTransporter = () => {
   if (transporter) return transporter;
 
@@ -92,8 +127,9 @@ export const sendRawEmail = async ({
       ? `[${ticketNumber}] ${subject}`
       : subject;
 
-  const transport = getTransporter();
-  if (!transport) {
+  const usesAppsScript = env.email.provider === 'apps_script';
+  const transport = usesAppsScript ? null : getTransporter();
+  if (!usesAppsScript && !transport) {
     logEmailToConsole({ to, subject, html, ticketNumber, sensitive });
 
     await EmailEvent.create({
@@ -112,7 +148,7 @@ export const sendRawEmail = async ({
   }
 
   try {
-    const info = await transport.sendMail({
+    const message = {
       from: env.email.from,
       to: toList.join(', '),
       subject: finalSubject,
@@ -126,10 +162,18 @@ export const sendRawEmail = async ({
             'In-Reply-To': `<ticket-${ticketNumber}@bitmax.support>`,
           }
         : {},
-    });
+    };
+    const info = usesAppsScript
+      ? await sendViaAppsScript({
+          to: message.to,
+          subject: message.subject,
+          html: message.html,
+          replyTo: message.replyTo,
+        })
+      : await transport.sendMail(message);
 
     logger.info(
-      `[Email] ✅ Sent — To: ${toList.join(', ')} | Subject: "${finalSubject}" | MsgID: ${info.messageId}`
+      `[Email] ✅ Sent via ${usesAppsScript ? 'Apps Script' : 'SMTP'} — To: ${toList.join(', ')} | Subject: "${finalSubject}" | MsgID: ${info.messageId}`
     );
 
     await EmailEvent.create({
@@ -165,13 +209,20 @@ export const sendRawEmail = async ({
 // Background queue handler — processes jobs from emailQueue
 // Each job type maps to a template and a sendRawEmail call
 // ─────────────────────────────────────────────────────────────────────────────
+const sendQueuedEmail = async (message) => {
+  const result = await sendRawEmail(message);
+  if (!result.success && !result.skipped) {
+    throw new Error(result.error || 'Email provider rejected the message');
+  }
+};
+
 emailQueue.setHandler(async (job) => {
   const { type, payload } = job.data;
 
   switch (type) {
     // ── Customer: ticket confirmation ─────────────────────────────────────────
     case 'TICKET_CREATED':
-      await sendRawEmail({
+      await sendQueuedEmail({
         to: payload.to,
         subject: `Your ticket has been received: ${payload.subject}`,
         html: ticketCreatedTemplate({
@@ -189,7 +240,7 @@ emailQueue.setHandler(async (job) => {
 
     // ── Agent: new ticket assignment notification ─────────────────────────────
     case 'TICKET_ASSIGNED':
-      await sendRawEmail({
+      await sendQueuedEmail({
         to: payload.to,
         subject: `New ticket assigned to you: ${payload.subject}`,
         html: ticketAssignedTemplate({
@@ -205,7 +256,7 @@ emailQueue.setHandler(async (job) => {
 
     // ── Ticket reply notification ─────────────────────────────────────────────
     case 'TICKET_REPLY':
-      await sendRawEmail({
+      await sendQueuedEmail({
         to: payload.to,
         subject: `New reply on your ticket: ${payload.subject}`,
         html: ticketReplyTemplate({
@@ -222,7 +273,7 @@ emailQueue.setHandler(async (job) => {
 
     // ── Status change notification ────────────────────────────────────────────
     case 'STATUS_CHANGED':
-      await sendRawEmail({
+      await sendQueuedEmail({
         to: payload.to,
         subject: `Ticket status updated [${payload.status}]: ${payload.subject}`,
         html: ticketStatusChangedTemplate({
@@ -238,7 +289,7 @@ emailQueue.setHandler(async (job) => {
       break;
 
     case 'TICKET_EVENT':
-      await sendRawEmail({
+      await sendQueuedEmail({
         to: payload.to,
         subject: payload.eventTitle,
         html: ticketEventTemplate({
@@ -255,7 +306,7 @@ emailQueue.setHandler(async (job) => {
 
     // ── OTP verification email ────────────────────────────────────────────────
     case 'OTP':
-      await sendRawEmail({
+      await sendQueuedEmail({
         to: payload.to,
         subject: 'Your BitMax Verification Code',
         html: otpTemplate({

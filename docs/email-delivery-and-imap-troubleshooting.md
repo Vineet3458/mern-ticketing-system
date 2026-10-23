@@ -1,71 +1,81 @@
-# Gmail Nodemailer and IMAP: Production Setup and Troubleshooting
+# Gmail Email via Google Apps Script
 
-This guide documents the production email diagnosis for the ticketing backend and the configuration needed for outgoing Gmail delivery and inbound ticket replies.
+This project can use a Google Apps Script web app to send ticket and OTP emails through Gmail and a scheduled Apps Script trigger to poll inbound ticket replies. This avoids Render's previous Nodemailer SMTP connection timeout and avoids needing Render to maintain a long-running IMAP poller.
 
-## Diagnosis
+## Confirmed diagnosis
 
-Render application logs showed:
+Render logs showed the Gmail Nodemailer transporter initialized, but an OTP email failed with `Connection timeout`. The error occurred while connecting to SMTP, before Gmail authentication. The same logs showed IMAP polling disabled, so inbound messages were not being checked by the backend. The Render service runs on the Free plan.
 
-- The Gmail Nodemailer transporter initialized, then the first OTP email failed with `Connection timeout`.
-- The backend logged `[InboundIMAP] Polling disabled`.
-- The Render service is on the Free plan.
-- Render's current service environment did not contain `GMAIL_IMAP_ENABLED`.
+The code now supports an Apps Script email provider. The Apps Script deployment and Google account authorization still have to be completed by the account owner before production email can be verified.
 
-The timeout happened while opening the SMTP connection, before Gmail could authenticate the account. This points to SMTP connectivity rather than an incorrect-password response. It does not, by itself, prove whether the timeout is caused by the Render network policy, Gmail reachability, or another network issue; the deployed app must be tested after the transport change below.
+## How the integration works
 
-IMAP was not attempting to connect at all: the feature is gated by `GMAIL_IMAP_ENABLED=true`, and it was disabled in the Blueprint and absent from the live service environment.
+- The backend's existing email queue keeps building the current ticket and OTP templates.
+- When `EMAIL_PROVIDER=apps_script`, the backend sends the rendered HTML to the configured Apps Script web app with a shared secret. The Apps Script runs as the Gmail account owner and sends with `GmailApp`.
+- An Apps Script time-based trigger checks unread messages in the Gmail inbox every minute. It forwards the sender, message ID, subject, and plain-text reply to the existing backend inbound-email processor.
+- The new `/api/email/inbound/apps-script` endpoint checks the shared secret before forwarding a message to the existing authorization and ticket matching code. Existing rules still require that the email sender is the ticket requester or assigned agent.
+- The Apps Script poller marks a message read only after the backend processes it or deliberately rejects/ignores it. Transient backend errors leave the message unread for retry.
+- Apps Script mode disables the backend's separate IMAP poller to avoid concurrent inbox consumers.
+- The backend queue retries failed provider calls before marking the queued job as failed.
 
-## Code and configuration changes
+The public Apps Script web app URL is not sufficient to send or process mail by itself: both sides must have the same strong secret, and Apps Script must be authorized to send and read Gmail.
 
-1. Nodemailer now connects explicitly to `smtp.gmail.com:587` with STARTTLS required. This avoids relying on Nodemailer's implicit Gmail service defaults (which use the SMTPS endpoint) and makes the intended SMTP transport explicit.
-2. The Render Blueprint now sets `GMAIL_IMAP_ENABLED=true`.
-3. The README now links to this guide and explains that IMAP polling requires an always-on backend instance.
+## Deploy the Apps Script
 
-No API routes, ticket behavior, message parsing, or email templates were changed. Gmail credentials remain backend-only.
+1. Sign in to the Google account that owns the support inbox and open [Google Apps Script](https://script.google.com/).
+2. Use the existing `code.gs` project if available, and replace its code with [`apps-script/Code.gs`](../apps-script/Code.gs) from this repository. The code remains compatible with the legacy `EMAIL_API_SECRET` Script Property as well as `APPS_SCRIPT_SECRET`.
+3. In **Project Settings → Script Properties**, add:
 
-## Gmail account prerequisites
+   | Property | Value |
+   | --- | --- |
+   | `BACKEND_API_URL` | `https://mern-ticketing-system-qqpf.onrender.com` (origin only, no `/api`) |
+   | `APPS_SCRIPT_SECRET` | A strong random secret you generate and keep private |
 
-1. Enable 2-Step Verification on the Gmail account used by the backend.
-2. Create a Gmail App Password for the backend. Do not use the normal Gmail account password.
-3. Confirm IMAP is enabled for the account in Gmail settings.
-4. If an App Password or other credential was exposed outside the secret manager, revoke it and create a replacement before continuing.
+   Generate a secret locally, for example with Node.js:
 
-## Render environment
+   ```powershell
+   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+   ```
 
-Set these variables on the **Render backend Web Service**, not in Vercel:
+   Do not paste the secret into chat, documentation, source code, Vercel, or a commit.
+4. Select `testSendEmail` in the Apps Script editor and run it once. Review and approve the Google permissions. It sends one test message to the script owner's account.
+5. Select `setupInboundPolling` and run it once. Approve Gmail read/modify and external request permissions. It installs a one-minute trigger and records a start time so old unread mail is not imported.
+6. For the existing web app deployment, choose **Deploy → Manage deployments → Edit** and deploy a new version. Preserve **Execute as: Me** and **Who has access: Anyone**. Public access is required for the backend-to-script request; both outbound requests and inbound webhooks are protected by the shared secret. Updating the existing deployment keeps its `/exec` URL; never use the editor's `/dev` URL in Render.
+7. Open the deployed `/exec` URL in a browser and confirm it returns a small JSON service status. Keep the deployment URL private as operational configuration, even though the shared secret is the actual authorization control.
+
+If you change Apps Script code after deployment, create a new deployment version. Existing time-based triggers continue using the current project code.
+
+## Configure Render
+
+Set these variables in the Render **backend Web Service** Environment page. Do not set them in Vercel:
 
 | Variable | Value |
 | --- | --- |
-| `GMAIL_USER` | Gmail support inbox address |
-| `GMAIL_APP_PASSWORD` | The account's Gmail App Password; store as a Render secret |
-| `EMAIL_FROM` | A sender label/address authorized for that Gmail account |
-| `GMAIL_IMAP_ENABLED` | `true` |
-| `GMAIL_IMAP_HOST` | `imap.gmail.com` (optional; this is the code default) |
-| `GMAIL_IMAP_PORT` | `993` (optional; this is the code default) |
-| `GMAIL_IMAP_POLL_INTERVAL_MS` | `60000` (optional; this is the code default) |
+| `EMAIL_PROVIDER` | `apps_script` |
+| `APPS_SCRIPT_URL` | The deployed Apps Script `/exec` URL |
+| `APPS_SCRIPT_SECRET` | The exact same random secret stored in Apps Script Script Properties |
+| `GMAIL_USER` | The Gmail support inbox address; this remains the ticket Reply-To address |
+| `GMAIL_IMAP_ENABLED` | `false`; Apps Script owns inbox polling |
 
-An existing Render service may not automatically receive Blueprint changes until the Blueprint is synced. Check the live Environment page and add or update `GMAIL_IMAP_ENABLED=true` there if necessary. Save the changes and redeploy/restart the backend. Keep the SMTP and IMAP credentials exclusively in Render's environment settings.
+The Apps Script Gmail account is the sending and polling account. Set `GMAIL_USER` to that same inbox so replies go to the inbox that Apps Script polls. `GMAIL_APP_PASSWORD` and `EMAIL_FROM` are not used for Apps Script sending. Do not remove the `GMAIL_APP_PASSWORD` until the SMTP fallback is no longer needed. Saving Render environment changes restarts/redeploys the service. If `EMAIL_PROVIDER=apps_script` is set without the URL and secret, the backend intentionally fails startup rather than silently using SMTP.
 
-The backend connects to Gmail SMTP on TCP port 587 and Gmail IMAP on TCP port 993. Confirm the Render service can make outbound connections to those endpoints. The current logs prove that SMTP previously timed out, but production delivery is not verified until a new email is accepted by Gmail. If port 587 still times out, check Render's current SMTP egress policy or ask Render Support whether this service/plan permits SMTP; changing credentials will not resolve a TCP connection timeout. Do not weaken authentication or switch to an unauthenticated mail transport.
+The Render service can remain on the Free plan for Apps Script operations; the scheduled inbox poll runs in Google's infrastructure. Render Free may still spin down, which can delay API requests and ticket activity, but it no longer needs to keep an IMAP socket alive.
 
-Free Render services can spin down after inactivity. An IMAP poller running in a free web service cannot provide reliable continuous inbox monitoring while the service is spun down. Use an always-on backend plan for dependable inbound polling and continuous Socket.IO availability.
+## Verification checklist
 
-The IMAP poller reads unread mail in the configured Gmail `INBOX`. The existing processing flow marks messages seen after processing, including unrelated messages it ignores because they have no ticket identifier. Use a dedicated support inbox rather than a personal inbox if unrelated unread mail should not be consumed.
+1. Run `testSendEmail` manually and confirm the message arrives in the support inbox.
+2. After setting the Render variables and redeploying, open the Vercel app and trigger an email action such as requesting an OTP.
+3. In Render logs, confirm the email is reported as sent via Apps Script. Confirm the OTP message arrives at the recipient and check spam if necessary.
+4. Reply to a ticket notification using the email account registered as that ticket's requester or assigned agent.
+5. In Apps Script **Executions**, confirm `pollInbox` runs; in Render logs, confirm the inbound message is processed and the ticket conversation updates.
+6. Confirm an unrelated or unauthorized sender cannot add a ticket reply, and check the `EmailEvent` record/log for the deliberate rejection.
+7. Check that no app password, shared secret, or Gmail credential appears in source, Vercel settings, frontend bundles, or logs.
 
-## Deploy and verify
+`GmailApp.sendEmail` returning successfully confirms Gmail accepted the send operation, not that the destination inbox received or displayed it. Verify receipt directly. Apps Script quotas, Gmail account restrictions, script deployment access, spam filtering, and trigger execution remain Google-side operational dependencies.
 
-1. Deploy the backend changes to Render.
-2. Confirm the live service has `GMAIL_IMAP_ENABLED=true`, `GMAIL_USER`, and a valid `GMAIL_APP_PASSWORD`. Never copy secret values into logs, tickets, or frontend settings.
-3. In Render logs after startup, confirm the service reports polling `imap.gmail.com:993/INBOX`. If it reports polling disabled or missing credentials, correct the Render environment and restart.
-4. Trigger an application email action, such as requesting a login OTP. Confirm the Render log reports a successful Nodemailer send and confirm receipt at the destination. A `Connection timeout` means SMTP is still unreachable; `EAUTH` indicates credentials/account authorization need attention.
-5. Reply to an email generated for a ticket. Confirm the reply arrives in the Gmail inbox and is processed into the matching ticket conversation. Inspect Render logs for IMAP connection and message-processing errors if it is not.
-6. Test the normal frontend login and ticket flows; email failures must not be treated as successful delivery.
+## Code verification and current status
 
-## Current verification status
-
-- **Confirmed from Render logs:** the previous SMTP attempt failed with `Connection timeout`.
-- **Confirmed from Render logs:** IMAP polling was disabled.
-- **Confirmed after the change:** `GMAIL_IMAP_ENABLED=true` was added to the live Render service, the `a8c6e92` backend deployment completed, and the IMAP poller processed unread messages. The processed messages shown in logs were ignored because they did not contain ticket identifiers.
-- **Local automated tests:** the existing focused email and IMAP parsing tests pass.
-- **Not yet verified:** a successful SMTP delivery or a real ticket reply imported into its matching conversation. Trigger a fresh email action and reply to a ticket email to verify those end-to-end paths.
-- **Manual action required:** verify the Gmail account prerequisites above and confirm the SMTP port 587 connection works from Render by triggering an application email.
+- The previous Render SMTP error (`Connection timeout`) and disabled IMAP polling are confirmed in application logs.
+- The project now contains Apps Script send and inbox-polling code, backend provider selection, a shared-secret-protected inbound route, and test coverage for provider dispatch and failed sends.
+- Local automated tests verify the backend Apps Script dispatch and inbound authentication behavior.
+- **Not yet verified in production:** a deployed Google Apps Script, successful recipient delivery, or a real ticket reply imported into MongoDB. These require the support inbox owner to deploy/authorize the Apps Script and add the resulting URL and shared secret to Render.
