@@ -38,3 +38,12 @@ export const createAdminSchema = Joi.object({
 export const updateUserRoleSchema = Joi.object({
   role: Joi.string().valid(...Object.values(ROLES)).required(),
 });
+
+export const requestEmailChangeSchema = Joi.object({
+  email: emailField.required(),
+});
+
+export const verifyEmailChangeSchema = Joi.object({
+  currentEmailOtp: Joi.string().trim().length(6).required(),
+  newEmailOtp: Joi.string().trim().length(6).required(),
+});

@@ -56,6 +56,12 @@ export const UserProfilePage = () => {
   const [phoneVerificationMessage, setPhoneVerificationMessage] = useState('');
   const [isRequestingPhoneOtp, setIsRequestingPhoneOtp] = useState(false);
   const [isVerifyingPhoneOtp, setIsVerifyingPhoneOtp] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [currentEmailOtp, setCurrentEmailOtp] = useState('');
+  const [newEmailOtp, setNewEmailOtp] = useState('');
+  const [emailChangePending, setEmailChangePending] = useState(false);
+  const [isRequestingEmailChange, setIsRequestingEmailChange] = useState(false);
+  const [isVerifyingEmailChange, setIsVerifyingEmailChange] = useState(false);
 
   const showSuccess = (msg) => { setSuccessMsg(msg); setErrorMsg(''); };
   const showError = (msg) => { setErrorMsg(msg); setSuccessMsg(''); };
@@ -91,6 +97,47 @@ export const UserProfilePage = () => {
       showError(err.response?.data?.message || 'Failed to verify mobile number.');
     } finally {
       setIsVerifyingPhoneOtp(false);
+    }
+  };
+
+  const handleRequestEmailChange = async (e) => {
+    e.preventDefault();
+    setIsRequestingEmailChange(true);
+    setSuccessMsg('');
+    setErrorMsg('');
+    try {
+      const res = await api.post('/users/profile/email-change', { email: newEmail });
+      setEmailChangePending(true);
+      setCurrentEmailOtp('');
+      setNewEmailOtp('');
+      showSuccess(res.data.message);
+    } catch (err) {
+      showError(err.response?.data?.message || 'Failed to send email change verification codes.');
+    } finally {
+      setIsRequestingEmailChange(false);
+    }
+  };
+
+  const handleVerifyEmailChange = async (e) => {
+    e.preventDefault();
+    setIsVerifyingEmailChange(true);
+    setSuccessMsg('');
+    setErrorMsg('');
+    try {
+      const res = await api.post('/users/profile/email-change/verify', {
+        currentEmailOtp,
+        newEmailOtp,
+      });
+      await dispatch(fetchUserProfile());
+      setEmailChangePending(false);
+      setNewEmail('');
+      setCurrentEmailOtp('');
+      setNewEmailOtp('');
+      showSuccess(res.data.message);
+    } catch (err) {
+      showError(err.response?.data?.message || 'Failed to verify the email change.');
+    } finally {
+      setIsVerifyingEmailChange(false);
     }
   };
 
@@ -184,7 +231,7 @@ export const UserProfilePage = () => {
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Work Email <span className="text-slate-400 font-normal">(read-only)</span>
+              Current Work Email
             </label>
             <div className="relative">
               <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
@@ -195,6 +242,9 @@ export const UserProfilePage = () => {
                 className="w-full text-sm border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 bg-slate-50 text-slate-400 cursor-not-allowed"
               />
             </div>
+            <p className="text-[11px] text-slate-500 mt-1">
+              To update your sign-in email, verify codes sent to both your current and new email addresses.
+            </p>
           </div>
 
           <div>
@@ -218,6 +268,78 @@ export const UserProfilePage = () => {
             </button>
           </div>
         </form>
+      </div>
+
+      <div className="bg-white rounded-3xl border border-slate-200/80 card-shadow p-6">
+        <h3 className="text-sm font-extrabold text-slate-900 mb-2">Change Sign-in Email</h3>
+        <p className="text-xs text-slate-500 mb-4">
+          We will send separate verification codes to your current email and the new address.
+        </p>
+        <form onSubmit={handleRequestEmailChange} className="flex flex-col sm:flex-row gap-2">
+          <input
+            type="email"
+            required
+            maxLength={100}
+            autoComplete="email"
+            value={newEmail}
+            onChange={(e) => {
+              setNewEmail(e.target.value);
+              setEmailChangePending(false);
+              setCurrentEmailOtp('');
+              setNewEmailOtp('');
+            }}
+            placeholder="Enter your new email address"
+            aria-label="New sign-in email address"
+            className="flex-1 text-sm border border-slate-200 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+          <button
+            type="submit"
+            disabled={isRequestingEmailChange || isVerifyingEmailChange || !newEmail.trim()}
+            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl disabled:opacity-50"
+          >
+            {isRequestingEmailChange ? 'Sending...' : emailChangePending ? 'Resend Codes' : 'Send Verification Codes'}
+          </button>
+        </form>
+        {emailChangePending && (
+          <form onSubmit={handleVerifyEmailChange} className="mt-4 space-y-3">
+            <p className="text-xs text-slate-600">
+              Enter the 6-digit code sent to <strong>{user?.email}</strong> and the code sent to <strong>{newEmail}</strong>.
+            </p>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                required
+                maxLength={6}
+                value={currentEmailOtp}
+                onChange={(e) => setCurrentEmailOtp(e.target.value.replace(/\D/g, ''))}
+                placeholder="Current email code"
+                aria-label="Current email verification code"
+                className="text-sm border border-slate-200 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                required
+                maxLength={6}
+                value={newEmailOtp}
+                onChange={(e) => setNewEmailOtp(e.target.value.replace(/\D/g, ''))}
+                placeholder="New email code"
+                aria-label="New email verification code"
+                className="text-sm border border-slate-200 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={isVerifyingEmailChange || currentEmailOtp.length !== 6 || newEmailOtp.length !== 6}
+              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl disabled:opacity-50"
+            >
+              {isVerifyingEmailChange ? 'Verifying...' : 'Verify and Change Email'}
+            </button>
+          </form>
+        )}
       </div>
 
       {!user?.isPhoneVerified && (

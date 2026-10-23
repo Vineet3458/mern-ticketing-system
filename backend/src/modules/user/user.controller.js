@@ -6,6 +6,9 @@ import { ROLES } from '../../constants/index.js';
 import bcrypt from 'bcryptjs';
 import { assertEmailNotRestricted } from '../../utils/emailRestrictions.js';
 import { normalizePhoneNumber } from '../../utils/phoneUtils.js';
+import { compareOTP, generateOTP, hashOTP } from '../../utils/otp.js';
+import { env } from '../../config/env.js';
+import { emailService } from '../../services/email.service.js';
 
 export const getProfile = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user.id);
@@ -46,6 +49,126 @@ export const updateProfile = asyncHandler(async (req, res) => {
     email: user.email,
     phone: user.phone,
     role: user.role,
+  });
+});
+
+export const requestEmailChange = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user.id);
+  if (!user) throw ApiError.notFound('User not found');
+
+  const pendingEmail = req.body.email.toLowerCase().trim();
+  if (pendingEmail === user.email.toLowerCase()) {
+    throw ApiError.badRequest('The new email address must be different from your current email');
+  }
+  if (await User.exists({ email: pendingEmail })) {
+    throw ApiError.conflict('An account with this email address already exists');
+  }
+
+  const currentEmailOtp = generateOTP();
+  const newEmailOtp = generateOTP();
+  user.pendingEmail = pendingEmail;
+  user.emailChangeCurrentOtpHash = await hashOTP(currentEmailOtp);
+  user.emailChangeNewOtpHash = await hashOTP(newEmailOtp);
+  user.emailChangeOtpExpiresAt = new Date(Date.now() + env.otp.expiresMinutes * 60 * 1000);
+  user.emailChangeOtpAttempts = 0;
+  await user.save();
+
+  emailService.queueOTP(user.email, user.name, currentEmailOtp);
+  emailService.queueOTP(pendingEmail, user.name, newEmailOtp);
+
+  return sendResponse(res, 200, 'Verification codes sent to your current and new email addresses', {
+    currentEmail: user.email,
+    pendingEmail,
+    expiresInMinutes: env.otp.expiresMinutes,
+  });
+});
+
+export const verifyEmailChange = asyncHandler(async (req, res) => {
+  const pendingChange = await User.findById(req.user.id).select(
+    '+pendingEmail +emailChangeCurrentOtpHash +emailChangeNewOtpHash +emailChangeOtpExpiresAt +emailChangeOtpAttempts'
+  );
+  if (!pendingChange) throw ApiError.notFound('User not found');
+  if (
+    !pendingChange.pendingEmail ||
+    !pendingChange.emailChangeCurrentOtpHash ||
+    !pendingChange.emailChangeNewOtpHash ||
+    !pendingChange.emailChangeOtpExpiresAt
+  ) {
+    throw ApiError.badRequest('No pending email change verification. Request new verification codes.');
+  }
+  if (pendingChange.emailChangeOtpAttempts >= env.otp.maxAttempts) {
+    throw ApiError.badRequest('Maximum verification attempts reached. Request new verification codes.');
+  }
+  if (Date.now() > pendingChange.emailChangeOtpExpiresAt.getTime()) {
+    throw ApiError.badRequest('Verification codes have expired. Request new verification codes.');
+  }
+
+  const user = await User.findOneAndUpdate(
+    {
+      _id: pendingChange._id,
+      pendingEmail: pendingChange.pendingEmail,
+      emailChangeOtpAttempts: { $lt: env.otp.maxAttempts },
+      emailChangeOtpExpiresAt: { $gt: new Date() },
+    },
+    { $inc: { emailChangeOtpAttempts: 1 } },
+    { new: true }
+  ).select(
+    '+pendingEmail +emailChangeCurrentOtpHash +emailChangeNewOtpHash +emailChangeOtpExpiresAt +emailChangeOtpAttempts'
+  );
+  if (!user) {
+    throw ApiError.badRequest('Email change verification is no longer active. Request new verification codes.');
+  }
+
+  const [currentEmailMatches, newEmailMatches] = await Promise.all([
+    compareOTP(req.body.currentEmailOtp, user.emailChangeCurrentOtpHash),
+    compareOTP(req.body.newEmailOtp, user.emailChangeNewOtpHash),
+  ]);
+  if (!currentEmailMatches || !newEmailMatches) {
+    throw ApiError.badRequest('One or both verification codes are incorrect');
+  }
+
+  if (await User.exists({ email: user.pendingEmail, _id: { $ne: user._id } })) {
+    throw ApiError.conflict('An account with this email address already exists');
+  }
+
+  let updatedUser;
+  try {
+    updatedUser = await User.findOneAndUpdate(
+      {
+        _id: user._id,
+        pendingEmail: user.pendingEmail,
+        emailChangeCurrentOtpHash: user.emailChangeCurrentOtpHash,
+        emailChangeNewOtpHash: user.emailChangeNewOtpHash,
+      },
+      {
+        $set: {
+          email: user.pendingEmail,
+          isVerified: true,
+          pendingEmail: null,
+          emailChangeCurrentOtpHash: null,
+          emailChangeNewOtpHash: null,
+          emailChangeOtpExpiresAt: null,
+          emailChangeOtpAttempts: 0,
+        },
+      },
+      { new: true, runValidators: true }
+    ).select('name email role isVerified');
+  } catch (error) {
+    if (error?.code === 11000) {
+      throw ApiError.conflict('An account with this email address already exists');
+    }
+    throw error;
+  }
+  if (!updatedUser) {
+    throw ApiError.badRequest('Email change verification is no longer active. Request new verification codes.');
+  }
+
+  return sendResponse(res, 200, 'Email address updated successfully', {
+    id: updatedUser._id,
+    name: updatedUser.name,
+    email: updatedUser.email,
+    role: updatedUser.role,
+    isVerified: updatedUser.isVerified,
   });
 });
 

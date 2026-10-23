@@ -67,6 +67,33 @@ const userSchema = new mongoose.Schema(
       select: false,
       default: null,
     },
+    pendingEmail: {
+      type: String,
+      lowercase: true,
+      trim: true,
+      default: null,
+      select: false,
+    },
+    emailChangeCurrentOtpHash: {
+      type: String,
+      select: false,
+      default: null,
+    },
+    emailChangeNewOtpHash: {
+      type: String,
+      select: false,
+      default: null,
+    },
+    emailChangeOtpExpiresAt: {
+      type: Date,
+      select: false,
+      default: null,
+    },
+    emailChangeOtpAttempts: {
+      type: Number,
+      select: false,
+      default: 0,
+    },
     phoneOtpHash: {
       type: String,
       select: false,

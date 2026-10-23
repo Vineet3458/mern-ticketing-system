@@ -49,6 +49,7 @@ describe('BitMax Production Ticketing System - Full Test Suite', () => {
 
   describe('1. Authentication Flow', () => {
     const testEmail = `test.user.${Date.now()}@example.com`;
+    const changedEmail = `updated.${Date.now()}@example.com`;
     let registrationOtp = '';
 
     it('should register a new user without exposing the OTP in the response', async () => {
@@ -86,6 +87,41 @@ describe('BitMax Production Ticketing System - Full Test Suite', () => {
       expect(res.body.data.user.isVerified).toBe(true);
       customerToken = res.body.data.tokens.accessToken;
       customerId = res.body.data.user.id;
+    });
+
+    it('should change the email only after verifying codes sent to both addresses', async () => {
+      const otpSpy = vi.spyOn(emailService, 'queueOTP');
+      try {
+        const requestRes = await request(app)
+          .post('/api/users/profile/email-change')
+          .set('Authorization', `Bearer ${customerToken}`)
+          .send({ email: changedEmail });
+
+        expect(requestRes.status).toBe(200);
+        expect(otpSpy).toHaveBeenCalledTimes(2);
+        const currentEmailOtp = otpSpy.mock.calls.find(([to]) => to === testEmail)[2];
+        const newEmailOtp = otpSpy.mock.calls.find(([to]) => to === changedEmail)[2];
+
+        const invalidRes = await request(app)
+          .post('/api/users/profile/email-change/verify')
+          .set('Authorization', `Bearer ${customerToken}`)
+          .send({ currentEmailOtp: '000000', newEmailOtp: '000000' });
+        expect(invalidRes.status).toBe(400);
+
+        const verifyRes = await request(app)
+          .post('/api/users/profile/email-change/verify')
+          .set('Authorization', `Bearer ${customerToken}`)
+          .send({ currentEmailOtp, newEmailOtp });
+        expect(verifyRes.status).toBe(200);
+        expect(verifyRes.body.data.email).toBe(changedEmail);
+        expect(verifyRes.body.data.role).toBe('customer');
+
+        const updatedUser = await User.findById(customerId);
+        expect(updatedUser.email).toBe(changedEmail);
+        expect(updatedUser.isVerified).toBe(true);
+      } finally {
+        otpSpy.mockRestore();
+      }
     });
 
     it('should return a mobile login OTP without calling SMS or email providers', async () => {
