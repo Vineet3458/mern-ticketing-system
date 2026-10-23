@@ -144,13 +144,43 @@ If the app reports an email failure, verify the script's execution log, that its
 
 The Apps Script executes under the Google account that deployed it and uses that account's Mail quota/sending identity. Keep the secret private and rotate it in both Apps Script Script Properties and the backend environment if exposed. Do not use an Apps Script `/dev` test URL in production. If an SMTP server accepts a message but its success response is lost, the fallback can cause a duplicate email; SMTP success is recorded immediately to avoid retrying successful sends.
 
+## Deploying the frontend to Vercel
+
+The frontend is a Vite single-page application. Its API and Socket.IO clients share `VITE_API_URL`; set this to the backend origin only (do not append `/api`):
+
+```text
+VITE_API_URL=https://mern-ticketing-system-qqpf.onrender.com
+```
+
+Only this public backend URL belongs in Vercel. Do not add MongoDB, JWT, email, SMTP, or Apps Script secrets to the frontend project. Backend email and database configuration remain on Render.
+
+1. Import this repository into Vercel.
+2. Set **Root Directory** to `frontend`. Vercel should detect Vite; use install command `npm ci`, build command `npm run build`, and output directory `dist`.
+3. In **Project Settings → Environment Variables**, add `VITE_API_URL` with the backend origin above for Production and any Preview/Development environments that should call this backend. Redeploy after changing an environment variable.
+4. Deploy and note the assigned `*.vercel.app` domain (and any custom domains).
+5. In the Render backend Web Service, set `CLIENT_URL` to a comma-separated list of the exact frontend origins, for example `https://<your-project>.vercel.app,https://<your-custom-domain>`. Keep the current Render frontend origin in that list if it is still used; include `http://localhost:5173` only if local frontend development should access production. Render's existing CORS and Socket.IO configuration read this value and allow credentials. Save the variable and redeploy the backend.
+
+The frontend's Axios client continues to send credentials and its existing bearer-token/refresh-token flow is unchanged. Socket.IO uses the same configured backend origin and retains its existing reconnect behavior. `frontend/vercel.json` rewrites client-side routes to `index.html`, so opening or refreshing nested routes works on Vercel.
+
+### Vercel deployment checklist
+
+- Confirm the production build completes with `VITE_API_URL` configured.
+- Open the deployed site and refresh `/login`, `/tickets`, and a ticket detail route.
+- Test registration/OTP, login, logout, token refresh, and password-reset flows.
+- Test ticket creation, listing, detail, message/status updates, and admin screens with the appropriate accounts.
+- Open a ticket in two browser sessions and verify live messages/status changes arrive.
+- Check browser Network/Console for requests going to the Render API, CORS failures, or Socket.IO connection errors.
+- Confirm email actions still reach the backend; email delivery itself depends on the existing Render email configuration.
+
+The live Vercel domain and deployed behavior cannot be verified until the Vercel project is created and the Render `CLIENT_URL` is updated.
+
 ## Deploying to Render
 
 The repository includes a Render Blueprint in `render.yaml` for separate services: a Node web service for the Express API and Socket.IO, and a Static Site for the Vite frontend.
 
 1. Push the latest code to GitHub and create/update the Render **Blueprint** from the repository root. The Blueprint sets the backend and frontend root directories separately.
 2. Set the prompted `MONGO_URI` to a production MongoDB Atlas connection string. The Blueprint generates separate access-token and refresh-token secrets.
-3. Set the backend `CLIENT_URL` to `https://mern-ticketing-system-1.onrender.com`. Set the frontend `VITE_BACKEND_URL` to `https://mern-ticketing-system-qqpf.onrender.com`, without `/api`.
+3. Set the backend `CLIENT_URL` to the frontend's exact origin. For the Render Static Site this is `https://mern-ticketing-system-1.onrender.com`; if serving the frontend from Vercel instead, follow the Vercel section above and include the Vercel origin. Set the frontend `VITE_API_URL` to `https://mern-ticketing-system-qqpf.onrender.com`, without `/api`.
 4. Optionally configure `GOOGLE_APPS_SCRIPT_URL` and `EMAIL_API_SECRET` for outbound email fallback, or Gmail SMTP credentials. `GMAIL_IMAP_ENABLED` defaults to `false`; continuous IMAP polling should only be enabled on an always-on service.
 5. Deploy both services. Check the backend `/api/health` URL, then open the frontend URL.
 
