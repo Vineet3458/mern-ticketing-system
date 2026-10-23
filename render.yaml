@@ -23,7 +23,7 @@ services:
       - key: JWT_REFRESH_SECRET
         generateValue: true
       - key: GMAIL_IMAP_ENABLED
-        value: "false"
+        value: "true"
   - type: static
     name: mern-ticketing-frontend
     rootDir: frontend
