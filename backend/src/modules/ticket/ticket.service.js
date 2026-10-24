@@ -17,6 +17,7 @@ import { ApiError } from '../../utils/ApiError.js';
 import { emailService } from '../../services/email.service.js';
 import { ioService } from '../../services/socket.service.js';
 import { logger } from '../../utils/logger.js';
+import { isAssignmentNotificationMessage } from '../../services/inboundEmail.service.js';
 import sanitizeHtml from 'sanitize-html';
 
 
@@ -108,12 +109,6 @@ export const ticketService = {
 
       // Notify the assigned agent by email
       emailService.queueTicketAssigned(ticket, agent);
-      emailService.queueTicketEvent(
-        ticket,
-        ticket.requesterEmail,
-        'Ticket assigned',
-        `Your ticket has been assigned to ${agent.name}.`
-      );
 
       logger.info(
         `[AutoAssign] ✅ Ticket ${ticket.ticketNumber} auto-assigned to ${agent.name} (${agent.email}) — workload: ${workloads[0].count} active tickets`
@@ -431,14 +426,6 @@ export const ticketService = {
     if (agent.email.toLowerCase() !== user.email.toLowerCase()) {
       emailService.queueTicketAssigned(ticket, agent);
     }
-    if (ticket.requesterEmail.toLowerCase() !== user.email.toLowerCase()) {
-      emailService.queueTicketEvent(
-        ticket,
-        ticket.requesterEmail,
-        'Ticket assigned',
-        `Your ticket has been assigned to ${agent.name}.`
-      );
-    }
 
     ioService.emitTicketAssigned(ticket._id.toString(), {
       ticketId: ticket._id.toString(),
@@ -666,7 +653,10 @@ export const ticketService = {
       .skip(skip)
       .limit(Number(limit));
 
-    return messages;
+    return messages.filter(
+      (message) =>
+        message.source !== MESSAGE_SOURCE.EMAIL || !isAssignmentNotificationMessage(message.body)
+    );
   },
 
   async getActivity({ ticketId, user }) {

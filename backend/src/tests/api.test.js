@@ -187,6 +187,7 @@ describe('BitMax Production Ticketing System - Full Test Suite', () => {
 
   describe('2. Ticket Creation and RBAC', () => {
     it('should allow authenticated customer to create a ticket with TKT number', async () => {
+      const assignmentEventSpy = vi.spyOn(emailService, 'queueTicketEvent');
       const res = await request(app)
         .post('/api/tickets')
         .set('Authorization', `Bearer ${customerToken}`)
@@ -197,7 +198,10 @@ describe('BitMax Production Ticketing System - Full Test Suite', () => {
           priority: 'high',
         });
 
+      const assignmentEventWasQueued = assignmentEventSpy.mock.calls.length > 0;
+      assignmentEventSpy.mockRestore();
       expect(res.status).toBe(201);
+      expect(assignmentEventWasQueued).toBe(false);
       expect(res.body.data.ticketNumber).toMatch(/^TKT-\d{4}-\d{6}$/);
       expect(res.body.data.status).toBe('open');
       createdTicketId = res.body.data._id;
@@ -240,12 +244,16 @@ describe('BitMax Production Ticketing System - Full Test Suite', () => {
 
   describe('3. Ticket Assignment and Workflow Lifecycle', () => {
     it('agent can assign ticket to themselves', async () => {
+      const assignmentEventSpy = vi.spyOn(emailService, 'queueTicketEvent');
       const res = await request(app)
         .post(`/api/tickets/${createdTicketId}/assign`)
         .set('Authorization', `Bearer ${agentToken}`)
         .send({ agentId });
 
+      const assignmentEventWasQueued = assignmentEventSpy.mock.calls.length > 0;
+      assignmentEventSpy.mockRestore();
       expect(res.status).toBe(200);
+      expect(assignmentEventWasQueued).toBe(false);
       expect(res.body.data.assignedTo).toBe(agentId);
     });
 

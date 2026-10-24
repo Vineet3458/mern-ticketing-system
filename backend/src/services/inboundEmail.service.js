@@ -12,6 +12,15 @@ import { logger } from '../utils/logger.js';
 import { ioService } from './socket.service.js';
 import { emailService } from './email.service.js';
 
+export const isAssignmentNotificationMessage = (body = '') =>
+  /(?:your ticket has been assigned to\s+[\s\S]{1,100}?\.|a support ticket has been assigned to you for investigation and resolution\.)/i.test(
+    body
+  );
+
+const isAssignmentNotificationEmail = ({ subject, body, html }) =>
+  isAssignmentNotificationMessage(body || html) &&
+  /(?:ticket assigned|new ticket assigned to you)/i.test(subject);
+
 // Strip common email quote replies (e.g., "On Sun, Jan 1 wrote:", "-----Original Message-----")
 export const stripQuotedEmail = (text = '') => {
   if (!text) return '';
@@ -135,6 +144,24 @@ export const processInboundEmail = async ({
       success: false,
       status: EMAIL_STATUS.IGNORED,
       message: `Ticket ${ticketNumber} not found`,
+    };
+  }
+
+  if (isAssignmentNotificationEmail({ subject, body, html })) {
+    logger.info(`[InboundEmail] Ignoring assignment notification for ticket ${ticketNumber}`);
+    await EmailEvent.create({
+      ticketId: ticket._id,
+      messageId: effectiveMessageId,
+      direction: EMAIL_DIRECTION.INBOUND,
+      status: EMAIL_STATUS.IGNORED,
+      error: 'System ticket assignment notification is not a ticket reply',
+      payload: { from: normFrom, to, subject, ticketNumber },
+      processedAt: new Date(),
+    });
+    return {
+      success: true,
+      status: EMAIL_STATUS.IGNORED,
+      message: 'Ticket assignment notification ignored',
     };
   }
 
