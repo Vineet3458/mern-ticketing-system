@@ -218,7 +218,7 @@ export const AdminUsersPage = () => {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
+            <table className="w-full min-w-[640px] text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
                   <th className="py-3.5 px-5">User</th>
@@ -310,7 +310,7 @@ export const AdminUsersPage = () => {
             Select the new authorization role. This change takes effect immediately.
           </p>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             {['customer', 'agent', 'admin'].map((r) => (
               <button
                 key={r}

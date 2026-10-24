@@ -78,14 +78,14 @@ export const CreateTicketPage = () => {
           <ArrowLeft className="w-4 h-4" />
         </Link>
         <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Create Support Ticket</h1>
+          <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Create Support Ticket</h1>
           <p className="text-xs text-slate-500 mt-0.5">
             Submit a new technical, billing, or platform request.
           </p>
         </div>
       </div>
 
-      <div className="bg-white rounded-3xl border border-slate-200/80 card-shadow p-8">
+      <div className="bg-white rounded-3xl border border-slate-200/80 card-shadow p-4 sm:p-8">
         {error && (
           <div className="mb-6 bg-rose-50 border border-rose-200 text-rose-700 p-3.5 rounded-xl text-xs flex items-center gap-2">
             <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -159,17 +159,17 @@ export const CreateTicketPage = () => {
             />
           </div>
 
-          <div className="pt-2 flex items-center justify-end gap-3 border-t border-slate-100">
+          <div className="pt-2 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-3 border-t border-slate-100">
             <Link
               to="/tickets"
-              className="px-5 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+              className="px-5 py-2.5 text-center text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
             >
               Cancel
             </Link>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="inline-flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-500/25 transition-all disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-500/25 transition-all disabled:opacity-50"
             >
               <Send className="w-3.5 h-3.5" />
               <span>{isSubmitting ? 'Creating Ticket...' : 'Submit Ticket'}</span>

@@ -210,7 +210,7 @@ export const TicketDetailPage = () => {
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       {/* Navigation & Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200/80 card-shadow">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-4 sm:p-6 rounded-3xl border border-slate-200/80 card-shadow">
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2.5">
             <Link
@@ -238,7 +238,7 @@ export const TicketDetailPage = () => {
             </span>
           </div>
 
-          <h1 className="text-xl font-black text-slate-900 tracking-tight">{currentTicket.subject}</h1>
+          <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight break-words">{currentTicket.subject}</h1>
         </div>
 
         {/* Quick Lifecycle Action Controls */}
@@ -279,8 +279,8 @@ export const TicketDetailPage = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left 2 Cols: Chronological Conversation */}
         <div className="lg:col-span-2 space-y-4">
-          <div className="bg-white rounded-3xl border border-slate-200/80 card-shadow p-6 space-y-6">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="bg-white rounded-3xl border border-slate-200/80 card-shadow p-3 sm:p-6 space-y-4 sm:space-y-6 min-w-0">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
               <h2 className="text-sm font-bold text-slate-800">Ticket Conversation Thread</h2>
               <div className="flex items-center gap-2 text-xs text-slate-400">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 live-indicator" />
@@ -297,7 +297,7 @@ export const TicketDetailPage = () => {
                 return (
                   <div
                     key={msg._id}
-                    className={`rounded-2xl p-4 transition-all ${
+                    className={`rounded-2xl p-3 sm:p-4 transition-all ${
                       isInternal
                         ? 'bg-amber-50/70 border-2 border-dashed border-amber-300'
                         : msg.senderRole === 'customer'
@@ -314,7 +314,7 @@ export const TicketDetailPage = () => {
                     )}
 
                     {/* Sender Info & Source */}
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2 min-w-0">
                       <div className="flex items-center gap-2.5">
                         <div
                           className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs ${
@@ -325,16 +325,16 @@ export const TicketDetailPage = () => {
                         >
                           {msg.senderName ? msg.senderName.charAt(0).toUpperCase() : 'U'}
                         </div>
-                        <div>
-                          <div className="text-xs font-bold text-slate-900 flex items-center gap-2">
-                            <span>{msg.senderName || msg.senderEmail}</span>
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-slate-900 flex flex-wrap items-center gap-2">
+                            <span className="break-all">{msg.senderName || msg.senderEmail}</span>
                             <RoleBadge role={msg.senderRole} />
                           </div>
-                          <span className="text-[11px] text-slate-400">{msg.senderEmail}</span>
+                          <span className="text-[11px] text-slate-400 break-all">{msg.senderEmail}</span>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                      <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
                         {isEmailSource ? (
                           <span className="inline-flex items-center gap-1 text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200 font-semibold">
                             <Mail className="w-3 h-3 text-purple-600" />
@@ -357,7 +357,7 @@ export const TicketDetailPage = () => {
 
                     {/* Message Body */}
                     <div
-                      className="text-xs text-slate-800 leading-relaxed whitespace-pre-wrap pl-9"
+                      className="text-xs text-slate-800 leading-relaxed whitespace-pre-wrap pl-0 sm:pl-9 break-words"
                       dangerouslySetInnerHTML={{ __html: msg.body }}
                     />
                   </div>
@@ -442,7 +442,7 @@ export const TicketDetailPage = () => {
         {/* Right 1 Col: Metadata & Activity Audit Sidebar */}
         <div className="space-y-6">
           {/* Ticket Information Card */}
-          <div className="bg-white rounded-3xl border border-slate-200/80 card-shadow p-6 space-y-4">
+          <div className="bg-white rounded-3xl border border-slate-200/80 card-shadow p-4 sm:p-6 space-y-4">
             <h3 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-3">
               Ticket Details
             </h3>
@@ -513,7 +513,7 @@ export const TicketDetailPage = () => {
           </div>
 
           {/* Activity / Audit History Panel */}
-          <div className="bg-white rounded-3xl border border-slate-200/80 card-shadow p-6 space-y-4">
+          <div className="bg-white rounded-3xl border border-slate-200/80 card-shadow p-4 sm:p-6 space-y-4">
             <h3 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-3 flex items-center justify-between">
               <span>Activity Timeline</span>
               <span className="text-[11px] text-slate-400 font-normal">Audit Log</span>

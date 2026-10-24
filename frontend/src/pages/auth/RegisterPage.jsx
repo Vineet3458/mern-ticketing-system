@@ -71,7 +71,7 @@ export const RegisterPage = () => {
         {/* Card */}
         <div className="bg-white rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
           {/* Brand header */}
-          <div className="bg-gradient-to-br from-blue-700 to-blue-500 px-8 py-6 text-white text-center">
+          <div className="bg-gradient-to-br from-blue-700 to-blue-500 px-5 sm:px-8 py-6 text-white text-center">
             <div className="inline-flex w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm items-center justify-center mb-3 shadow-lg">
               <LifeBuoy className="w-7 h-7 text-white" />
             </div>
@@ -79,7 +79,7 @@ export const RegisterPage = () => {
             <p className="text-blue-100 text-xs mt-1">Join the BitMax Support Network</p>
           </div>
 
-          <div className="p-8">
+          <div className="p-5 sm:p-8">
             {error && (
               <div className="mb-5 bg-rose-50 border border-rose-200 text-rose-700 p-3.5 rounded-2xl text-xs flex items-start gap-2 anim-slide-up">
                 <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
@@ -163,7 +163,7 @@ export const RegisterPage = () => {
               {/* Role */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">Account Role</label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {[
                     { value: 'customer', label: 'Customer', desc: 'Raise & track tickets', icon: User },
                     { value: 'agent', label: 'Support Agent', desc: 'Respond & resolve', icon: Zap },

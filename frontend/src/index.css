@@ -27,6 +27,7 @@
   body {
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     @apply bg-slate-50 text-slate-800 selection:bg-blue-600 selection:text-white min-h-screen;
+    overflow-x: hidden;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -34,6 +35,18 @@
 
   h1, h2, h3, h4, h5, h6 {
     letter-spacing: -0.02em;
+  }
+
+  #root {
+    min-height: 100vh;
+    width: 100%;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    max-width: 100%;
   }
 }
 
@@ -244,4 +257,22 @@ select:focus-visible {
   background: linear-gradient(90deg, #2563eb 0%, #7c3aed 50%, #2563eb 100%);
   background-size: 200% 100%;
   animation: shimmer 3s linear infinite;
+}
+
+@media (max-width: 640px) {
+  .text-\[9px\] {
+    font-size: 0.6875rem;
+  }
+
+  .text-\[10px\] {
+    font-size: 0.75rem;
+  }
+
+  .text-\[11px\] {
+    font-size: 0.8125rem;
+  }
+
+  .text-xs {
+    font-size: 0.8125rem;
+  }
 }

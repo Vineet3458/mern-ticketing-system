@@ -209,7 +209,7 @@ export const UserProfilePage = () => {
       )}
 
       {/* Profile Edit Form */}
-      <div className="bg-white rounded-3xl border border-slate-200/80 card-shadow p-8">
+      <div className="bg-white rounded-3xl border border-slate-200/80 card-shadow p-4 sm:p-8">
         <h3 className="text-sm font-extrabold text-slate-900 mb-5 flex items-center gap-2">
           <User className="w-4 h-4 text-blue-600" />
           Edit Profile

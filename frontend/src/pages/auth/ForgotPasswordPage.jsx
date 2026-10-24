@@ -31,7 +31,7 @@ export const ForgotPasswordPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 border border-slate-100">
+      <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-5 sm:p-8 border border-slate-100">
         <div className="text-center mb-6">
           <div className="inline-flex w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-700 to-blue-500 items-center justify-center text-white shadow-lg shadow-blue-500/25 mb-3">
             <LifeBuoy className="w-7 h-7" />

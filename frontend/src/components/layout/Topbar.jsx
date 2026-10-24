@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { LogOut, User, ChevronDown, Crown, Zap, Settings, Shield } from 'lucide-react';
+import { LogOut, User, ChevronDown, Crown, Zap, Shield, Menu, LifeBuoy } from 'lucide-react';
 import { logoutUser } from '../../features/auth/authSlice.js';
 import { RoleBadge } from '../common/RoleBadge.jsx';
 
@@ -15,7 +15,7 @@ const PAGE_TITLES = {
   '/admin/categories': 'Categories',
 };
 
-export const Topbar = () => {
+export const Topbar = ({ onMenuClick, isSidebarOpen = false }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
@@ -49,12 +49,37 @@ export const Topbar = () => {
     : 'from-slate-800 to-slate-700';
 
   return (
-    <header className="h-16 bg-white/95 backdrop-blur-sm border-b border-slate-200/80 px-8 flex items-center justify-between sticky top-0 z-20">
+    <header className="h-16 bg-white/95 backdrop-blur-sm border-b border-slate-200/80 px-3 sm:px-5 lg:px-8 flex items-center justify-between sticky top-0 z-20">
       {/* Page title */}
-      <div className="flex items-center gap-3">
-        <div>
-          <h2 className="font-extrabold text-slate-900 text-base leading-none">{pageTitle}</h2>
-          <p className="text-[10px] text-slate-400 font-medium mt-0.5 uppercase tracking-wider">BitMax Support Platform</p>
+      <div className="flex items-center gap-3 min-w-0">
+        <button
+          type="button"
+          onClick={onMenuClick}
+          aria-label="Toggle navigation menu"
+          aria-controls="primary-navigation"
+          aria-expanded={isSidebarOpen}
+          className="p-2 -ml-2 rounded-lg text-slate-600 hover:bg-slate-100 xl:hidden"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+        <button
+          type="button"
+          onClick={onMenuClick}
+          aria-label="Open navigation menu: BitMax Desk"
+          aria-controls="primary-navigation"
+          aria-expanded={isSidebarOpen}
+          className="inline-flex sm:hidden items-center gap-2 min-w-0 text-left"
+        >
+          <span className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-700 to-blue-500 flex items-center justify-center text-white shadow-md shadow-blue-500/25 flex-shrink-0">
+            <LifeBuoy className="w-5 h-5" />
+          </span>
+          <span className="font-extrabold text-slate-900 tracking-tight text-sm whitespace-nowrap">
+            BitMax<span className="text-blue-600">.</span>Desk
+          </span>
+        </button>
+        <div className="hidden sm:block min-w-0">
+          <h2 className="font-extrabold text-slate-900 text-base leading-none truncate">{pageTitle}</h2>
+          <p className="hidden md:block text-[10px] text-slate-400 font-medium mt-0.5 uppercase tracking-wider">BitMax Support Platform</p>
         </div>
       </div>
 
@@ -78,7 +103,7 @@ export const Topbar = () => {
             <div className={`w-9 h-9 rounded-xl bg-gradient-to-tr ${avatarGradient} text-white font-black flex items-center justify-center text-sm shadow-md`}>
               {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
             </div>
-            <div className="text-left hidden lg:block">
+            <div className="text-left hidden xl:block">
               <div className="text-xs font-bold text-slate-900 leading-tight flex items-center gap-1.5">
                 <span>{user?.name || 'User'}</span>
                 {isAdmin && <Crown className="w-3 h-3 text-purple-500" />}

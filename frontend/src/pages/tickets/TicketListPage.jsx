@@ -97,7 +97,7 @@ export const TicketListPage = () => {
 
       {/* View Tabs (All / My Tickets / Unassigned) */}
       {isAgentOrAdmin && (
-        <div className="flex gap-2 border-b border-slate-200 pb-2">
+        <div className="flex gap-2 border-b border-slate-200 pb-2 overflow-x-auto">
           <button
             onClick={() => updateParam('view', 'all')}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
@@ -132,7 +132,7 @@ export const TicketListPage = () => {
       )}
 
       {/* Filter and Search Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 card-shadow space-y-3">
+      <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/80 card-shadow space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           {/* Search Box */}
           <form onSubmit={handleSearchSubmit} className="lg:col-span-2 relative">
@@ -213,7 +213,7 @@ export const TicketListPage = () => {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+            <table className="w-full min-w-[900px] text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
                   <th className="py-3 px-4">Ticket</th>
@@ -295,7 +295,7 @@ export const TicketListPage = () => {
 
         {/* Pagination Footer */}
         {meta && meta.totalPages > 1 && (
-          <div className="flex items-center justify-between p-4 border-t border-slate-100 bg-slate-50/50 text-xs text-slate-500">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 sm:p-4 border-t border-slate-100 bg-slate-50/50 text-xs text-slate-500">
             <div>
               Showing page <strong className="text-slate-800">{meta.page}</strong> of{' '}
               <strong className="text-slate-800">{meta.totalPages}</strong> ({meta.total} tickets total)

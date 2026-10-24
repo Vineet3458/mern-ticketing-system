@@ -38,7 +38,7 @@ export const ResetPasswordPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 border border-slate-100">
+      <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-5 sm:p-8 border border-slate-100">
         <div className="text-center mb-6">
           <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Set New Password</h2>
           <p className="text-xs text-slate-500 mt-1">Provide your OTP code and choose a new password</p>

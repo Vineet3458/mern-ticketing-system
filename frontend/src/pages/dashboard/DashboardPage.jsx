@@ -98,9 +98,9 @@ export const DashboardPage = () => {
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 sm:space-y-8">
       {/* Top Banner & Quick Actions */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-blue-900 to-indigo-950 p-6 rounded-3xl text-white shadow-xl relative overflow-hidden">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-blue-900 to-indigo-950 p-4 sm:p-6 rounded-3xl text-white shadow-xl relative overflow-hidden">
         <div className="absolute right-0 top-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10">
@@ -109,7 +109,7 @@ export const DashboardPage = () => {
               Welcome back, {user?.name}
             </span>
           </div>
-          <h1 className="text-2xl font-black tracking-tight">Support Operations Center</h1>
+          <h1 className="text-xl sm:text-2xl font-black tracking-tight">Support Operations Center</h1>
           <p className="text-xs text-blue-200/80 mt-1">
             Real-time ticket lifecycle management, bidirectional email synchronization, and SLA analytics.
           </p>
@@ -118,7 +118,7 @@ export const DashboardPage = () => {
         <div className="flex items-center gap-3 relative z-10">
           <Link
             to="/tickets/create"
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-500 hover:bg-blue-400 text-white text-xs font-bold transition-all shadow-lg shadow-blue-500/30"
+            className="flex items-center justify-center gap-2 w-full sm:w-auto px-4 py-2.5 rounded-xl bg-blue-500 hover:bg-blue-400 text-white text-xs font-bold transition-all shadow-lg shadow-blue-500/30"
           >
             <PlusCircle className="w-4 h-4" />
             <span>Create Ticket</span>
@@ -127,16 +127,16 @@ export const DashboardPage = () => {
       </div>
 
       {/* Metrics Stat Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
         {statCards.map((c, i) => {
           const Icon = c.icon;
           return (
             <div
               key={i}
-              className={`bg-white p-5 rounded-2xl border ${c.border} card-shadow card-shadow-hover flex flex-col justify-between`}
+              className={`bg-white p-3 sm:p-5 rounded-2xl border ${c.border} card-shadow card-shadow-hover flex flex-col justify-between min-w-0`}
             >
               <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold text-slate-500">{c.title}</span>
+                <span className="text-[11px] sm:text-xs font-semibold text-slate-500">{c.title}</span>
                 <div className={`p-2 rounded-xl ${c.bg} ${c.color}`}>
                   <Icon className="w-4 h-4" />
                 </div>
@@ -286,7 +286,7 @@ export const DashboardPage = () => {
       </div>
 
       {/* Recent Activity Timeline Stream */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 card-shadow p-6">
+      <div className="bg-white rounded-2xl border border-slate-200/80 card-shadow p-4 sm:p-6">
         <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
           <div>
             <h3 className="font-bold text-slate-900 text-sm">Recent Ticket Activity Stream</h3>

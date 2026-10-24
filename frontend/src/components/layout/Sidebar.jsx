@@ -12,6 +12,7 @@ import {
   UserPlus,
   Crown,
   Zap,
+  X,
 } from 'lucide-react';
 
 const NavItem = ({ to, icon: Icon, children, color = 'text-slate-500', isActive = false }) => (
@@ -34,7 +35,7 @@ const SectionLabel = ({ children, className = '' }) => (
   </div>
 );
 
-export const Sidebar = () => {
+export const Sidebar = ({ isOpen = false, onClose }) => {
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const currentView = searchParams.get('view');
@@ -64,9 +65,14 @@ export const Sidebar = () => {
   const isAdminUsersActive = pathname.startsWith('/admin/users');
 
   return (
-    <aside className="w-64 bg-white border-r border-slate-200/80 flex flex-col h-screen fixed left-0 top-0 z-30 select-none">
+    <aside
+      id="primary-navigation"
+      className={`w-64 max-w-[85vw] bg-white border-r border-slate-200/80 flex flex-col h-screen fixed left-0 top-0 z-40 select-none transition-transform duration-200 xl:translate-x-0 ${
+        isOpen ? 'translate-x-0' : '-translate-x-full'
+      }`}
+    >
       {/* Brand Header */}
-      <div className="h-16 px-5 flex items-center gap-3 border-b border-slate-100/80">
+      <div className="h-16 px-4 sm:px-5 flex items-center gap-3 border-b border-slate-100/80">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-700 to-blue-500 flex items-center justify-center text-white shadow-md shadow-blue-500/25 flex-shrink-0">
           <LifeBuoy className="w-5 h-5" />
         </div>
@@ -78,6 +84,14 @@ export const Sidebar = () => {
             Ticketing & Email
           </span>
         </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close navigation menu"
+          className="ml-auto p-2 rounded-lg text-slate-500 hover:bg-slate-100 xl:hidden"
+        >
+          <X className="w-4 h-4" />
+        </button>
       </div>
 
       {/* Navigation */}
