@@ -15,15 +15,23 @@ services:
       - key: SERVE_FRONTEND
         value: "false"
       - key: CLIENT_URL
-        value: https://mern-ticketing-system-jq9i6r1bd-vineet-yadavs-projects-748fa972.vercel.app
+        value: https://mern-ticketing-system.vercel.app,https://mern-ticketing-system-jq9i6r1bd-vineet-yadavs-projects-748fa972.vercel.app
       - key: MONGO_URI
         sync: false
       - key: JWT_ACCESS_SECRET
         generateValue: true
       - key: JWT_REFRESH_SECRET
         generateValue: true
+      - key: EMAIL_PROVIDER
+        value: apps_script
+      - key: APPS_SCRIPT_URL
+        sync: false
+      - key: APPS_SCRIPT_SECRET
+        sync: false
+      - key: GMAIL_USER
+        sync: false
       - key: GMAIL_IMAP_ENABLED
-        value: "true"
+        value: "false"
   - type: static
     name: mern-ticketing-frontend
     rootDir: frontend
